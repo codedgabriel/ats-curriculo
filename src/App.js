@@ -423,7 +423,8 @@ const [formData, setFormData] = useState({
   emissor: "",
   data: "",
   cargaHoraria: "",
-  descricao: ""
+  descricao: "",
+  linkValidacao: ""
 }],
   idiomas: [{ idioma: "", nivel: "" }],
 });
@@ -1189,7 +1190,6 @@ if (newPage !== page) {
       y -= sectionGap;
     }
     
-// Na seção de certificações do gerarPDF, substitua por:
 if (formData.certificacoes.some(c => c.titulo && c.titulo.trim())) {
   drawSectionTitle(t.secoesPDF.certificacoes);
   
@@ -1197,9 +1197,9 @@ if (formData.certificacoes.some(c => c.titulo && c.titulo.trim())) {
     .filter(c => c.titulo && c.titulo.trim())
     .forEach(cert => {
       const newPage = checkForNewPage();
-if (newPage !== page) {
-  page = newPage;
-}
+      if (newPage !== page) {
+        page = newPage;
+      }
       
       // Título e Emissor
       const tituloEmissor = [
@@ -1245,6 +1245,22 @@ if (newPage !== page) {
           1.1
         );
         y -= lines2 * (8 * 1.1);
+      }
+
+      // Link de validação (se existir)
+      if (cert.linkValidacao) {
+        const linkText = `Link de validação: ${cert.linkValidacao}`;
+        const lines3 = drawText(
+          sanitizeForATS(linkText),
+          marginX + 8,
+          y,
+          8,
+          maxWidth - 8,
+          font,
+          rgb(0, 0, 0.8), // Azul mais escuro para links
+          1.1
+        );
+        y -= lines3 * (8 * 1.1);
       }
       
       // Descrição
@@ -1638,6 +1654,19 @@ const renderCertificationFields = () => {
             placeholder="Ex: 40 horas"
           />
         </div>
+      </div>
+
+      {/* Novo campo para link de validação */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">Link de Validação</label>
+        <input
+          type="url"
+          value={cert.linkValidacao || ""}
+          onChange={(e) => handleArrayChange("certificacoes", idx, "linkValidacao", e.target.value)}
+          className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+          placeholder="Ex: https://certificado.instituicao.com/123456"
+        />
+        <p className="text-xs text-gray-500 mt-1">Link para verificar a autenticidade da certificação</p>
       </div>
 
       <div>
