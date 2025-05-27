@@ -81,8 +81,8 @@ dataCertificacao: "Data",
 cargaHoraria: "Carga Horária",
 descricaoCertificacao: "Descrição",
         tipoFormacao: "Tipo de Formação",
-        curso: "Curso*",
-        instituicao: "Instituição*",
+        curso: "Curso",
+        instituicao: "Instituição",
         periodo: "Período",
         cargo: "Cargo",
         empresa: "Empresa",
@@ -174,8 +174,8 @@ descricaoCertificacao: "Descrição",
         idiomas: "Languages",
         certificacoes: "Certifications",
         tipoFormacao: "Education Level",
-        curso: "Course*",
-        instituicao: "Institution*",
+        curso: "Course",
+        instituicao: "Institution",
         periodo: "Period",
         cargo: "Position",
         empresa: "Company",
@@ -267,8 +267,8 @@ descricaoCertificacao: "Descrição",
         idiomas: "Idiomas",
         certificacoes: "Certificaciones",
         tipoFormacao: "Nivel de Formación",
-        curso: "Curso*",
-        instituicao: "Institución*",
+        curso: "Curso",
+        instituicao: "Institución",
         periodo: "Período",
         cargo: "Puesto",
         empresa: "Empresa",
@@ -498,21 +498,7 @@ const validateForm = () => {
     if (!firstErrorSection) firstErrorSection = "resumo";
   }
   
-  // Validação das formações (seção "formacao")
-  formData.formacoes.forEach((form, idx) => {
-    // Só valida curso se não for ensino médio (ou equivalente em outros idiomas)
-    const isEnsinoMedio = form.tipo === "medio";
-    
-    if (!isEnsinoMedio && !form.curso.trim()) {
-      newErrors[`formacao_curso_${idx}`] = t.campos.curso.replace("*", "") + " é obrigatório";
-      if (!firstErrorSection) firstErrorSection = "formacao";
-    }
-    
-    if (!form.instituicao.trim()) {
-      newErrors[`formacao_instituicao_${idx}`] = t.campos.instituicao.replace("*", "") + " é obrigatória";
-      if (!firstErrorSection) firstErrorSection = "formacao";
-    }
-  });
+  // Removida a validação das formações
   
   setErrors(newErrors);
   
@@ -1495,14 +1481,10 @@ const renderEducationFields = () => {
             type="text"
             value={form.curso}
             onChange={(e) => handleArrayChange("formacoes", idx, "curso", e.target.value)}
-            className={`w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-              errors[`formacao_curso_${idx}`] ? "border-red-500" : ""
-            }`}
+            className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             placeholder={t.placeholders.curso}
           />
-          {errors[`formacao_curso_${idx}`] && (
-            <p className="text-red-500 text-xs mt-2">{errors[`formacao_curso_${idx}`]}</p>
-          )}
+         
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">{t.campos.instituicao}</label>
