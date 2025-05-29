@@ -1929,7 +1929,11 @@ const renderCertificationFields = () => {
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
     </svg>
-    Informações Pessoais
+    {{
+      pt: "Informações Pessoais",
+      en: "Personal Information",
+      es: "Información Personal"
+    }[idiomaApp]}
   </h2>
   
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
@@ -2036,7 +2040,11 @@ const renderCertificationFields = () => {
   {/* Links de redes sociais */}
   <div className="mt-4">
     <div className="flex justify-between items-center mb-3">
-      <h3 className="text-sm font-medium text-gray-700">Links e Redes Sociais</h3>
+      <h3 className="text-sm font-medium text-gray-700">{{
+    pt: "Links e Redes Sociais",
+    en: "Links and Social Media",
+    es: "Enlaces y Redes Sociales"}[idiomaApp]}
+    </h3>
       <button
         type="button"
         onClick={() => addField("links", { tipo: "linkedin", url: "" })}
@@ -2045,7 +2053,11 @@ const renderCertificationFields = () => {
         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
         </svg>
-        Adicionar Link
+        {{
+          pt: "Adicionar Link",
+          en: "Add Link",
+          es: "Añadir enlace"
+        }[idiomaApp]}
       </button>
     </div>
     
@@ -2081,7 +2093,6 @@ const renderCertificationFields = () => {
               placeholder={t.placeholders.resumo}
             />
             {errors.resumo && <p className="text-red-500 text-xs mt-1 sm:mt-2">{errors.resumo}</p>}
-            <p className="text-xs text-gray-500">{t.placeholders.resumo.split(":")[0]}</p>
           </div>
           
           {/* Experiência Profissional */}
@@ -2171,7 +2182,6 @@ const renderCertificationFields = () => {
                 className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 placeholder={t.placeholders.habilidades}
               />
-              <p className="text-xs text-gray-500 mt-1 sm:mt-2">{t.placeholders.habilidades.split(":")[0]}</p>
               
               {/* Preview das habilidades */}
               {formData.habilidades.length > 0 && (
@@ -2229,7 +2239,11 @@ const renderCertificationFields = () => {
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
       </svg>
-      Certificações/Cursos
+      {{
+      pt: "Certificações/Cursos",
+      en: "Certifications/Courses",
+      es: "Certificaciones/Cursos"
+    }[idiomaApp]}
     </h2>
     <button
       type="button"
@@ -2245,7 +2259,11 @@ const renderCertificationFields = () => {
       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
       </svg>
-      Adicionar Certificação/Curso
+      {{
+    pt: "Adicionar Certificação/Cursos",
+    en: "Add Certification/Courses",
+    es: "Añadir Certificación/Cursos"
+  }[idiomaApp]}
     </button>
   </div>
 
@@ -2280,7 +2298,11 @@ const renderCertificationFields = () => {
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
           </svg>
-          Anterior
+          {{
+    pt: "Anterior",
+    en: "Previous",
+    es: "Anterior"
+  }[idiomaApp]}
 </button>
             
             {activeSection !== "certificacoes" ? (
@@ -2295,7 +2317,11 @@ const renderCertificationFields = () => {
                 }}
                 className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg transition-colors shadow-md hover:shadow-lg"
               >
-                Próximo
+              {{
+    pt: "Próximo",
+    en: "Next",
+    es: "Próximo"
+  }[idiomaApp]}
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                 </svg>
@@ -2610,7 +2636,11 @@ const renderCertificationFields = () => {
           </a>
         </div>
         <p className="text-xs sm:text-sm text-gray-500">
-          Criado por <span className="font-medium text-gray-700">D. Gabriel</span> - {new Date().getFullYear()}
+        {{
+    pt: "Criado por ",
+    en: "Created by ",
+    es: "Creado por "
+  }[idiomaApp]}<span className="font-medium text-gray-700">D. Gabriel</span> - {new Date().getFullYear()}
         </p>
       </div>
     </div>
