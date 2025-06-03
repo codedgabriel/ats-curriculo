@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-function EmojisWarning({ showError }) {
+function GenericWarning({warning}) {
   const [mostrarErro, setMostrarErro] = useState(true);
 
   return (
@@ -10,9 +10,7 @@ function EmojisWarning({ showError }) {
           <div className="bg-yellow-100 border w-fit self-center border-yellow-400 text-yellow-800 px-4 py-3 rounded relative m-4">
             <strong className="font-bold">Atenção:</strong>
             <span className="block sm:inline ml-2">
-              Estamos melhorando a geração de conteúdo com emojis e alguns
-              caracteres especiais. Por enquanto, evite usá-los para garantir o
-              funcionamento.
+              {warning}
             </span>
 
             <button
@@ -28,4 +26,4 @@ function EmojisWarning({ showError }) {
   );
 }
 
-export default EmojisWarning;
+export default GenericWarning;

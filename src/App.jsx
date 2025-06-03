@@ -1,88 +1,43 @@
 import { useState } from "react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import LoadedDataModal from "./ui/modals/LoadedDataModal";
-import EmojisWarning from "./ui/modals/EmojisWarning";
-import NavBar from "./ui/NavBar";
-import Footer from "./ui/Footer";
-import ResumeSection from "./ui/sections/ResumeSection";
+import GenericWarning from "./ui/modals/GenericWarning";
 
+// componentes de UI
+import NavBar from "./ui/layout/NavBar";
+import Footer from "./ui/layout/Footer";
+import ResumeSection from "./ui/sections/ResumeSection";
+import Navigation from './ui/layout/Navigation'
+
+// componentes modal
+import QRCode from "./ui/modals/QRCode";
+import Payment from "./ui/modals/Payment";
+import ConfirmPayment from "./ui/modals/ConfirmPayment";
+import LoadedDataModal from "./ui/modals/LoadedDataModal";
+import Sucess from "./ui/modals/Sucess";
+
+// componentes de seções
+import LanguagesSection from "./ui/sections/LanguagesSection";
+import CertificationsSection from "./ui/sections/CertificationsSections";
+import ExperiencesSection from "./ui/sections/ExperiencesSection";
+import PersonalInfoSection from "./ui/sections/PersonalInfoSection";
+import EducationSection from "./ui/sections/EducationSection";
+
+// campos utilizadas no preenchimento
 import {
   idiomasApp,
   textos,
   paisesTelefone,
   tiposCurso,
   sanitizeForATS,
+  curriculumFields,
+  meses,
+  statusFormacao,
+  tiposRedesSociais
 } from "./utils/fields";
+import TechSkillsSection from "./ui/sections/TechSkillsSection";
 
 function App() {
-  const [formData, setFormData] = useState({
-    nome: "",
-    telefone: "",
-    ddd: "",
-    codigoPais: "+55",
-    cidade: "",
-    email: "",
-    links: [{ tipo: "linkedin", url: "" }],
-    cargoDesejado: "",
-    resumo: "",
-    experiencias: [],
-    formacoes: [
-      {
-        tipo: "superior",
-        curso: "",
-        instituicao: "",
-        mesInicio: "",
-        anoInicio: "",
-        mesFim: "",
-        anoFim: "",
-        emAndamento: false,
-        descricao: "",
-      },
-    ],
-    habilidades: [],
-    certificacoes: [
-      {
-        titulo: "",
-        emissor: "",
-        data: "",
-        cargaHoraria: "",
-        descricao: "",
-        linkValidacao: "",
-      },
-    ],
-    idiomas: [{ idioma: "", nivel: "" }],
-  });
-
-  const meses = [
-    { valor: "01", label: "Janeiro" },
-    { valor: "02", label: "Fevereiro" },
-    { valor: "03", label: "Março" },
-    { valor: "04", label: "Abril" },
-    { valor: "05", label: "Maio" },
-    { valor: "06", label: "Junho" },
-    { valor: "07", label: "Julho" },
-    { valor: "08", label: "Agosto" },
-    { valor: "09", label: "Setembro" },
-    { valor: "10", label: "Outubro" },
-    { valor: "11", label: "Novembro" },
-    { valor: "12", label: "Dezembro" },
-  ];
-
-  const statusFormacao = [
-    { valor: "completo", label: "Completo" },
-    { valor: "andamento", label: "Em andamento" },
-    { valor: "trancado", label: "Trancado" },
-  ];
-
-  const tiposRedesSociais = [
-    { valor: "linkedin", label: "LinkedIn", prefixo: "linkedin.com/in/" },
-    { valor: "github", label: "GitHub", prefixo: "github.com/" },
-    { valor: "gitlab", label: "GitLab", prefixo: "gitlab.com/" },
-    { valor: "behance", label: "Behance", prefixo: "behance.net/" },
-    { valor: "portfolio", label: "Portfolio", prefixo: "" },
-    { valor: "outro", label: "outro", prefixo: "" },
-  ];
-
+  const [formData, setFormData] = useState(curriculumFields);
   const [errors, setErrors] = useState({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -424,7 +379,7 @@ function App() {
       // 2. Informações de Contato (mais compacto)
       const contactInfo = [
         formData.telefone &&
-          `${formData.codigoPais} ${formData.ddd} ${formData.telefone}`,
+        `${formData.codigoPais} ${formData.ddd} ${formData.telefone}`,
         formData.email,
         formData.cidade,
         ...formData.links
@@ -476,22 +431,19 @@ function App() {
         drawSectionTitle(t.secoesPDF.experiencia);
 
         formData.experiencias.forEach((exp, idx) => {
-          // Formata o período
-          const mesInicio = formatarMes(exp.mesInicio);
-          const mesFim = formatarMes(exp.mesFim);
-
+          ;
           const periodoExp = [
             exp.mesInicio &&
-              `${formatarMes(exp.mesInicio, idiomaApp)} ${exp.anoInicio}`,
+            `${formatarMes(exp.mesInicio, idiomaApp)} ${exp.anoInicio}`,
             exp.atual
               ? idiomaApp === "en"
                 ? "Present"
                 : idiomaApp === "es"
-                ? "Actual"
-                : "Atual"
+                  ? "Actual"
+                  : "Atual"
               : exp.mesFim && exp.anoFim
-              ? `${formatarMes(exp.mesFim, idiomaApp)} ${exp.anoFim}`
-              : "",
+                ? `${formatarMes(exp.mesFim, idiomaApp)} ${exp.anoFim}`
+                : "",
           ]
             .filter(Boolean)
             .join(" - ");
@@ -639,21 +591,19 @@ function App() {
 
             let periodoFormatado = "";
             if (form.status === "andamento") {
-              periodoFormatado = `${mesInicio} ${form.anoInicio} - ${
-                idiomaApp === "en"
-                  ? "Present"
-                  : idiomaApp === "es"
+              periodoFormatado = `${mesInicio} ${form.anoInicio} - ${idiomaApp === "en"
+                ? "Present"
+                : idiomaApp === "es"
                   ? "Actual"
                   : "Presente"
-              }`;
+                }`;
             } else if (form.status === "trancado") {
-              periodoFormatado = `${mesInicio} ${form.anoInicio} - ${
-                idiomaApp === "en"
-                  ? "On hold"
-                  : idiomaApp === "es"
+              periodoFormatado = `${mesInicio} ${form.anoInicio} - ${idiomaApp === "en"
+                ? "On hold"
+                : idiomaApp === "es"
                   ? "En pausa"
                   : "Trancado"
-              }`;
+                }`;
             } else if (form.mesFim && form.anoFim) {
               periodoFormatado = `${mesInicio} ${form.anoInicio} - ${mesFim} ${form.anoFim}`;
             } else {
@@ -1286,9 +1236,8 @@ function App() {
                   e.target.value
                 )
               }
-              className={`w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-                errors[`formacao_instituicao_${idx}`] ? "border-red-500" : ""
-              }`}
+              className={`w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${errors[`formacao_instituicao_${idx}`] ? "border-red-500" : ""
+                }`}
               placeholder={t.placeholders.instituicao}
             />
             {errors[`formacao_instituicao_${idx}`] && (
@@ -1624,14 +1573,12 @@ function App() {
                   onChange={(e) =>
                     handleArrayChange("links", idx, "url", e.target.value)
                   }
-                  className={`flex-1 min-w-0 p-2 ${
-                    redeSocial.prefixo
-                      ? "rounded-none rounded-r-lg"
-                      : "rounded-lg"
-                  } border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-                  placeholder={`Ex: ${
-                    t.placeholders[link.tipo] || "seu-usuario"
-                  }`}
+                  className={`flex-1 min-w-0 p-2 ${redeSocial.prefixo
+                    ? "rounded-none rounded-r-lg"
+                    : "rounded-lg"
+                    } border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                  placeholder={`Ex: ${t.placeholders[link.tipo] || "seu-usuario"
+                    }`}
                 />
               </div>
             </div>
@@ -1761,11 +1708,10 @@ function App() {
               <button
                 onClick={() => gerarPDF()}
                 disabled={isGenerating}
-                className={`px-4 sm:px-6 py-2 rounded-full text-white font-medium flex items-center justify-center transition-all ${
-                  isGenerating
-                    ? "bg-gray-500 cursor-not-allowed"
-                    : "bg-blue-500 hover:bg-blue-600 shadow-md hover:shadow-lg"
-                }`}
+                className={`px-4 sm:px-6 py-2 rounded-full text-white font-medium flex items-center justify-center transition-all ${isGenerating
+                  ? "bg-gray-500 cursor-not-allowed"
+                  : "bg-blue-500 hover:bg-blue-600 shadow-md hover:shadow-lg"
+                  }`}
               >
                 {isGenerating ? (
                   <>
@@ -1862,27 +1808,17 @@ function App() {
       />
 
       {/* aviso */}
-      <EmojisWarning />
-      
+      <GenericWarning
+        warning="Estamos melhorando a geração de conteúdo 
+      com emojis e alguns caracteres especiais. 
+      Por enquanto, evite usá-los para garantir o funcionamento."
+      />
+
       {/* Conteúdo principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {successMessage && (
-          <div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-4 rounded-lg flex items-center mb-6">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 mr-2 text-green-500"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <p>{successMessage}</p>
-          </div>
-        )}
+        <Sucess
+          message={successMessage}
+        />
 
         <form
           onSubmit={(e) => {
@@ -1892,209 +1828,16 @@ function App() {
           className="space-y-6 sm:space-y-8"
         >
           {/* Seção de Informações Pessoais */}
-          <div
-            id="info"
-            className={`space-y-4 sm:space-y-6 ${
-              activeSection !== "info" && "hidden"
-            }`}
-          >
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
-              Informações Pessoais
-            </h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  {t.campos.nome}
-                </label>
-                <input
-                  type="text"
-                  name="nome"
-                  value={formData.nome}
-                  onChange={handleChange}
-                  className={`w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-                    errors.nome ? "border-red-500" : ""
-                  }`}
-                  placeholder={t.placeholders.nome}
-                />
-                {errors.nome && (
-                  <p className="text-red-500 text-xs mt-1 sm:mt-2">
-                    {errors.nome}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  {t.campos.cargoDesejado}
-                </label>
-                <input
-                  type="text"
-                  name="cargoDesejado"
-                  value={formData.cargoDesejado}
-                  onChange={handleChange}
-                  className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder={t.placeholders.cargoDesejado}
-                />
-              </div>
-            </div>
-
-            {/* Telefone com DDD e código do país */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  {t.campos.codigoPais}
-                </label>
-                <select
-                  name="codigoPais"
-                  value={formData.codigoPais}
-                  onChange={handleChange}
-                  className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                >
-                  {paisesTelefone.map((pais) => (
-                    <option key={pais.codigo} value={pais.codigo}>
-                      {pais.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  {t.campos.ddd}
-                </label>
-                <input
-                  type="text"
-                  name="ddd"
-                  value={formData.ddd}
-                  onChange={handleChange}
-                  className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder={t.placeholders.ddd}
-                  maxLength="2"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  {t.campos.telefone}
-                </label>
-                <input
-                  type="tel"
-                  name="telefone"
-                  value={formData.telefone}
-                  onChange={handleChange}
-                  className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder={t.placeholders.telefone}
-                />
-              </div>
-            </div>
-
-            {/* Email e Cidade */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  {t.campos.email}
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className={`w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-                    errors.email ? "border-red-500" : ""
-                  }`}
-                  placeholder={t.placeholders.email}
-                />
-                {errors.email && (
-                  <p className="text-red-500 text-xs mt-1 sm:mt-2">
-                    {errors.email}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  {t.campos.cidade}
-                </label>
-                <input
-                  type="text"
-                  name="cidade"
-                  value={formData.cidade}
-                  onChange={handleChange}
-                  className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder={t.placeholders.cidade}
-                />
-              </div>
-            </div>
-
-            {/* Links de redes sociais */}
-            <div className="mt-4">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-medium text-gray-700">
-                  Links e Redes Sociais
-                </h3>
-                <button
-                  type="button"
-                  onClick={() =>
-                    addField("links", { tipo: "linkedin", url: "" })
-                  }
-                  className="flex items-center text-blue-600 hover:text-blue-800 text-sm"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 mr-1"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  Adicionar Link
-                </button>
-              </div>
-
-              {formData.links.length > 0 ? (
-                renderLinkFields()
-              ) : (
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-8 w-8 mx-auto text-gray-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-                    />
-                  </svg>
-                  <p className="mt-2 text-sm text-gray-500">
-                    Nenhum link adicionado
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+          <PersonalInfoSection
+            t={t}
+            section={activeSection}
+            data={formData}
+            handle={handleChange}
+            error={errors}
+            phoneCountry={paisesTelefone}
+            field={addField}
+            renderFields={renderLinkFields}
+          />
 
           {/* Resumo Profissional */}
           <ResumeSection
@@ -2106,822 +1849,82 @@ function App() {
           />
 
           {/* Experiência Profissional */}
-          <div
-            id="experiencia"
-            className={`space-y-4 sm:space-y-6 ${
-              activeSection !== "experiencia" && "hidden"
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                  />
-                </svg>
-                {t.campos.experiencia}
-              </h2>
-              <button
-                type="button"
-                onClick={() =>
-                  addField("experiencias", {
-                    cargo: "",
-                    empresa: "",
-                    periodo: "",
-                    tecnologias: "",
-                    atividades: "",
-                    resultados: "",
-                  })
-                }
-                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg transition-colors w-full sm:w-auto justify-center"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 sm:h-5 sm:w-5 mr-1"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                {t.botoes.adicionarExperiencia}
-              </button>
-            </div>
-
-            {formData.experiencias.length > 0 ? (
-              renderExperienceFields()
-            ) : (
-              <div className="bg-gray-50 p-4 sm:p-6 rounded-lg border border-gray-200 text-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1}
-                    d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
-                  />
-                </svg>
-                <p className="mt-2 text-sm text-gray-500">
-                  {t.mensagens.nenhumaExperiencia}
-                </p>
-              </div>
-            )}
-          </div>
+          <ExperiencesSection
+            t={t}
+            section={activeSection}
+            field={addField}
+            data={formData}
+            renderFields={renderExperienceFields}
+          />
 
           {/* Formação Acadêmica */}
-          <div
-            id="formacao"
-            className={`space-y-4 sm:space-y-6 ${
-              activeSection !== "formacao" && "hidden"
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path d="M12 14l9-5-9-5-9 5 9 5z" />
-                  <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"
-                  />
-                </svg>
-                {t.campos.formacao}
-              </h2>
-              <button
-                type="button"
-                onClick={() =>
-                  addField("formacoes", {
-                    tipo: "superior",
-                    curso: "",
-                    instituicao: "",
-                    mesInicio: "",
-                    anoInicio: "",
-                    mesFim: "",
-                    anoFim: "",
-                    emAndamento: false,
-                    descricao: "", // Novo campo
-                  })
-                }
-                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg transition-colors w-full sm:w-auto justify-center"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 sm:h-5 sm:w-5 mr-1"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                {t.botoes.adicionarFormacao}
-              </button>
-            </div>
-
-            {renderEducationFields()}
-          </div>
+          <EducationSection
+          t={t}
+          section={activeSection}
+          field={addField}
+          renderFields={renderEducationFields}
+          />
 
           {/* Habilidades Técnicas */}
-          <div
-            id="habilidades"
-            className={`space-y-4 sm:space-y-6 ${
-              activeSection !== "habilidades" && "hidden"
-            }`}
-          >
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                />
-              </svg>
-              {t.campos.habilidades}
-            </h2>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                {t.placeholders.habilidades.split(":")[0]}
-              </label>
-              <input
-                type="text"
-                value={habilidadesInput}
-                onChange={handleHabilidadesChange}
-                className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                placeholder={t.placeholders.habilidades}
-              />
-              <p className="text-xs text-gray-500 mt-1 sm:mt-2">
-                {t.placeholders.habilidades.split(":")[0]}
-              </p>
-
-              {/* Preview das habilidades */}
-              {formData.habilidades.length > 0 && (
-                <div className="mt-3 sm:mt-4">
-                  <p className="text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                    Pré-visualização:
-                  </p>
-                  <div className="flex flex-wrap gap-1 sm:gap-2">
-                    {formData.habilidades.map((skill, idx) => (
-                      <span
-                        key={idx}
-                        className="bg-blue-100 text-blue-800 text-xs sm:text-sm px-2 sm:px-3 py-1 rounded-full"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <TechSkillsSection
+          t={t}
+          section={activeSection}
+          input={habilidadesInput}
+          handle={handleHabilidadesChange}
+          data={formData}
+          />
 
           {/* Idiomas */}
-          <div
-            id="idiomas"
-            className={`space-y-4 sm:space-y-6 ${
-              activeSection !== "idiomas" && "hidden"
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
-                  />
-                </svg>
-                {t.campos.idiomas}
-              </h2>
-              <button
-                type="button"
-                onClick={() => addField("idiomas", { idioma: "", nivel: "" })}
-                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg transition-colors w-full sm:w-auto justify-center"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 sm:h-5 sm:w-5 mr-1"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                {t.botoes.adicionarIdioma}
-              </button>
-            </div>
-
-            {formData.idiomas.length > 0 ? (
-              renderLanguageFields()
-            ) : (
-              <div className="bg-gray-50 p-4 sm:p-6 rounded-lg border border-gray-200 text-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1}
-                    d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
-                  />
-                </svg>
-                <p className="mt-2 text-sm text-gray-500">
-                  {t.mensagens.nenhumIdioma}
-                </p>
-              </div>
-            )}
-          </div>
+          <LanguagesSection
+            section={activeSection}
+            t={t}
+            field={addField}
+            data={formData}
+            renderFields={renderLanguageFields}
+          />
 
           {/* Certificações */}
-          <div
-            id="certificacoes"
-            className={`space-y-4 sm:space-y-6 ${
-              activeSection !== "certificacoes" && "hidden"
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                  />
-                </svg>
-                Certificações/Cursos
-              </h2>
-              <button
-                type="button"
-                onClick={() =>
-                  addField("certificacoes", {
-                    titulo: "",
-                    emissor: "",
-                    data: "",
-                    cargaHoraria: "",
-                    descricao: "",
-                  })
-                }
-                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg transition-colors w-full sm:w-auto justify-center"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 sm:h-5 sm:w-5 mr-1"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Adicionar Certificação/Curso
-              </button>
-            </div>
-
-            {formData.certificacoes.length > 0 ? (
-              renderCertificationFields()
-            ) : (
-              <div className="bg-gray-50 p-4 sm:p-6 rounded-lg border border-gray-200 text-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1}
-                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                  />
-                </svg>
-                <p className="mt-2 text-sm text-gray-500">
-                  Nenhuma certificação ou curso adicionado (opcional)
-                </p>
-              </div>
-            )}
-          </div>
+          <CertificationsSection
+            section={activeSection}
+            field={addField}
+            data={formData}
+            renderFields={renderCertificationFields}
+          />
 
           {/* Navegação entre seções */}
-          <div className="flex flex-col-reverse sm:flex-row justify-between pt-6 sm:pt-8 border-t border-gray-200 gap-4">
-            <button
-              type="button"
-              onClick={() => {
-                const sections = [
-                  "info",
-                  "resumo",
-                  "experiencia",
-                  "formacao",
-                  "habilidades",
-                  "idiomas",
-                  "certificacoes",
-                ];
-                const currentIndex = sections.indexOf(activeSection);
-                if (currentIndex > 0) {
-                  setActiveSection(sections[currentIndex - 1]);
-                }
-              }}
-              disabled={activeSection === "info"}
-              className={`flex items-center justify-center px-4 sm:px-6 py-2 sm:py-3 rounded-lg transition-colors ${
-                activeSection === "info"
-                  ? "text-gray-400 cursor-not-allowed"
-                  : "text-blue-600 hover:bg-blue-50"
-              }`}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 sm:h-5 sm:w-5 mr-2"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Anterior
-            </button>
-
-            {activeSection !== "certificacoes" ? (
-              <button
-                type="button"
-                onClick={() => {
-                  const sections = [
-                    "info",
-                    "resumo",
-                    "experiencia",
-                    "formacao",
-                    "habilidades",
-                    "idiomas",
-                    "certificacoes",
-                  ];
-                  const currentIndex = sections.indexOf(activeSection);
-                  if (currentIndex < sections.length - 1) {
-                    setActiveSection(sections[currentIndex + 1]);
-                  }
-                }}
-                className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg transition-colors shadow-md hover:shadow-lg"
-              >
-                Próximo
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 sm:h-5 sm:w-5 ml-2"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => gerarPDF()}
-                disabled={isGenerating}
-                className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg text-white font-medium flex items-center justify-center transition-all ${
-                  isGenerating
-                    ? "bg-gray-500 cursor-not-allowed"
-                    : "bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg"
-                }`}
-              >
-                {isGenerating ? (
-                  <>
-                    <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 sm:h-5 sm:w-5 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    <span className="text-sm sm:text-base">
-                      {t.mensagens.gerando}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    <span className="text-sm sm:text-base">
-                      {t.botoes.gerarCV}
-                    </span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
+          <Navigation
+          setSection={setActiveSection}
+          section={activeSection}
+          click={gerarPDF}
+          generatedState={isGenerating}
+          t={t}
+          />
         </form>
       </main>
+
       {/* engraçado que o projeto é open-souce, eu coloco um qr code pra galera ajudar a hospedar essa bomba e tão pensando q é pra pagar kkkkk pra quem fala que front é facil é pq nunca teve que lidar com cliente, meu amigo... */}
-      {showPaymentModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="modal-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowPaymentModal(false);
-              setShowConfirmationModal(false);
-              setShowQRCode(false);
-            }
-          }}
-        >
-          <div className="relative w-full max-w-md rounded-2xl bg-gradient-to-br from-white to-gray-50 p-6 shadow-2xl animate-[fadeIn_0.3s_ease-out] border border-gray-200 mx-2">
-            {/* Botão X */}
-            <button
-              onClick={() => {
-                setShowPaymentModal(false);
-                setShowConfirmationModal(false);
-                setShowQRCode(false);
-              }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-all duration-200 hover:scale-110"
-              aria-label="Fechar modal"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-
-            {/* Conteúdo principal */}
-            <div className="text-center mb-6">
-              <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 animate-bounce">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-8 w-8 text-blue-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 
-              2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09
-              C13.09 3.81 14.76 3 16.5 3 
-              19.58 3 22 5.42 22 8.5 
-              c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-                  />
-                </svg>
-              </div>
-
-              <h3
-                id="modal-title"
-                className="text-2xl font-bold text-gray-800 mb-2"
-              >
-                Apoie nosso trabalho
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Gostou do serviço? Considere fazer uma doação para nos ajudar a
-                manter e melhorar a plataforma!
-              </p>
-
-              {/* Barra de progresso da doação - Textos invertidos */}
-              <div className="mb-4">
-                <div className="flex justify-between text-sm text-gray-600 mb-1">
-                  <span>R$15,64 doados (ajustado manualmente)</span>
-                  <span>Meta: R$40,00</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div
-                    className="bg-blue-600 h-2.5 rounded-full"
-                    style={{ width: `${(15.64 / 40) * 100}%` }}
-                  ></div>
-                </div>
-                <p className="text-xs text-gray-500 mt-1 text-center">
-                  Ajude-nos a alcançar nossa meta para custear o domínio!
-                </p>
-              </div>
-            </div>
-
-            {/* Botões de ação */}
-            <div className="space-y-3">
-              <button
-                onClick={() => setShowConfirmationModal(true)}
-                className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-medium rounded-lg hover:shadow-md transition-all flex items-center justify-center gap-2"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                Doar
-              </button>
-
-              <button
-                onClick={() => {
-                  window.location.href =
-                    "mailto:codegabriel.ti@gmail.com?subject=Problema%20com%20geração%20de%20currículo";
-                  setShowPaymentModal(false);
-                }}
-                className="w-full px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-                Reportar um problema
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Payment
+      paymentModal={showPaymentModal}
+      paymentModalState={setShowPaymentModal}
+      confirmationModalState={setShowConfirmationModal}
+      QRCodeState={setShowQRCode}
+      />
 
       {/* Modal de Confirmação */}
-      {showConfirmationModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-[fadeIn_0.3s_ease-out] border border-gray-200 mx-2">
-            <button
-              onClick={() => setShowConfirmationModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-all hover:scale-110"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-
-            <div className="mb-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">
-                Faça sua doação
-              </h3>
-
-              <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3 mb-4">
-                <p className="text-sm text-yellow-800 text-center">
-                  ⚠️ A contribuição{" "}
-                  <span className="font-bold">não é obrigatória</span> para
-                  gerar o currículo.
-                  <br />
-                  Se seu currículo não foi gerado, clique em{" "}
-                  <span className="font-semibold">"Reportar um problema"</span>.
-                </p>
-              </div>
-
-              <p className="text-sm text-gray-600 mb-4">
-                Sua doação ajuda a manter o serviço gratuito para todos e a
-                implementar melhorias.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <button
-                onClick={() => {
-                  setShowConfirmationModal(false);
-                  setShowQRCode(true);
-                }}
-                className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-medium rounded-lg hover:shadow-md transition-all"
-              >
-                Continuar para doação
-              </button>
-
-              <button
-                onClick={() => setShowConfirmationModal(false)}
-                className="w-full px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-all"
-              >
-                Voltar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmPayment
+        confirmationModalState={showConfirmationModal}
+        setConfirmationModalState={setShowConfirmationModal}
+        setQRCodeState={setShowQRCode}
+      />
 
       {/* Modal do QR Code */}
-      {showQRCode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-[fadeIn_0.3s_ease-out] border border-gray-200 mx-2">
-            <button
-              onClick={() => setShowQRCode(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-all hover:scale-110"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-
-            <div className="text-center mb-2">
-              <h3 className="text-xl font-bold text-gray-800">
-                Doação via PIX
-              </h3>
-              <p className="text-sm text-gray-600">
-                Escaneie o QR Code ou copie a chave
-              </p>
-            </div>
-
-            <div className="flex flex-col items-center mb-6">
-              <div className="p-4 bg-white rounded-xl shadow-lg ring-2 ring-blue-200/50 mb-4">
-                <img
-                  src="/qrcode.png"
-                  alt="QR Code para doação via PIX"
-                  className="w-48 h-48 object-contain rounded-lg"
-                />
-              </div>
-
-              <div
-                className="w-full bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4 cursor-pointer hover:bg-blue-100 transition-colors group"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(
-                      "80eb8e06-493b-4870-9dfc-47ed230c5d16"
-                    );
-                    alert("Chave PIX copiada com sucesso!");
-                  } catch (err) {
-                    console.error("Falha ao copiar:", err);
-                    // Fallback para navegadores mais antigos
-                    const textArea = document.createElement("textarea");
-                    textArea.value = "80eb8e06-493b-4870-9dfc-47ed230c5d16";
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    try {
-                      document.execCommand("copy");
-                      alert("Chave PIX copiada com sucesso!");
-                    } catch (err) {
-                      alert(
-                        "Não foi possível copiar automaticamente. Por favor, copie manualmente."
-                      );
-                    }
-                    document.body.removeChild(textArea);
-                  }
-                }}
-              >
-                <p className="text-xs font-medium text-blue-800 mb-1">
-                  Chave PIX (clique para copiar):
-                </p>
-                <div className="flex items-center justify-between bg-white p-2 rounded">
-                  <p className="text-xs font-mono text-gray-700 break-all">
-                    80eb8e06-493b-4870-9dfc-47ed230c5d16
-                  </p>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 text-gray-500 group-hover:text-blue-500 transition-colors"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z" />
-                    <path d="M3 8a2 2 0 012-2v10h8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
-                  </svg>
-                </div>
-              </div>
-
-              <div className="bg-green-50 border border-green-100 rounded-lg p-3 w-full">
-                <p className="text-xs text-green-800 text-center">
-                  Muito obrigado pelo seu apoio! ❤️
-                  <br />
-                  Sua contribuição nos ajuda a continuar melhorando este
-                  projeto.
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowQRCode(false)}
-              className="w-full px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-all"
-            >
-              Voltar
-            </button>
-          </div>
-        </div>
-      )}
+      <QRCode
+        active={showQRCode}
+        setActive={setShowQRCode}
+      />
 
       {/*toast de dados carregados */}
       <LoadedDataModal setData={setFormData} />
-
 
       {/* rodapé */}
       <Footer />
