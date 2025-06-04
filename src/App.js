@@ -1,2623 +1,1705 @@
-import { useState, useEffect } from "react";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { PDFDocument, rgb, StandardFonts, PageSizes } from "pdf-lib";
 
-
-
-const sanitizeForATS = (text) => {
-  if (!text) return text;
-  if (typeof text !== 'string') return "";
-  
-  // Mapeamento de caracteres especiais para suas versões ASCII
-  const replacements = {
-    '∑': 'SUM', 
-    '≤': '<=',
-    '≥': '>=',
-    '≠': '!=',
-    '―': '-',
-    '–': '-',
-    '—': '-',
-    '“': '"',
-    '”': '"',
-    '‘': "'",
-    '’': "'",
-    '…': '...',
-    '•': '-',
-    '→': '->',
-    '←': '<-',
-    '±': '+/-',
-    'μ': 'u',
-    '°': 'deg'
-  };
-  
-  // Substitui caracteres especiais e remove outros não suportados
-  return text
-    .replace(/[∑≤≥≠―–—“”‘’…•→←±μ°]/g, char => replacements[char] || '')
-};
-
-function App() {
-
-  
-
-  // aviso aqui bobão
-  const [mostrarErro, setMostrarErro] = useState(true);
-
-
-  // Opções de idioma para a aplicação
-  const idiomasApp = [
-    { codigo: "pt", nome: "Português", icone: "🇧🇷" },
-    { codigo: "en", nome: "English", icone: "🇺🇸" },
-    { codigo: "es", nome: "Español", icone: "🇪🇸" },
-  ];
-
-  // Textos traduzidos
-  const textos = {
-    pt: {
-      tituloApp: "Gerador de Currículo",
-      subtituloApp: "Crie um currículo profissional em minutos",
-      dicasATS: "Dicas para um currículo ATS-friendly",
-      dicasLista: [
-        "Use palavras-chave relevantes para a vaga",
-        "Mantenha o formato simples e legível",
-        "Inclua métricas e resultados concretos",
-        "Destaque suas principais habilidades técnicas"
-      ],
-      campos: {
-        nome: "Informações Pessoais",
-        cargoDesejado: "Cargo Desejado",
-        codigoPais: "Código do País",
-        ddd: "DDD",
-        telefone: "Telefone",
-        cidade: "Cidade",
-        linkedin: "LinkedIn",
-        portfolio: "Portfolio/GitHub",
-        email: "Email*",
-        resumo: "Resumo Profissional*",
-        experiencia: "Experiência Profissional",
-        formacao: "Formação Acadêmica",
-        habilidades: "Habilidades Técnicas",
-        idiomas: "Idiomas",
-        certificacoes: "Certificações/Cursos",
-dataCertificacao: "Data",
-cargaHoraria: "Carga Horária",
-descricaoCertificacao: "Descrição",
-        tipoFormacao: "Tipo de Formação",
-        curso: "Curso",
-        instituicao: "Instituição",
-        periodo: "Período",
-        cargo: "Cargo",
-        empresa: "Empresa",
-        tecnologias: "Tecnologias utilizadas",
-        atividades: "Atividades realizadas",
-        resultados: "Resultados alcançados (com métricas)",
-        idioma: "Idioma",
-        nivel: "Nível",
-        certificacao: "Certificação",
-      },
-      placeholders: {
-        nome: "Ex: João da Silva",
-        cargoDesejado: "Ex: Desenvolvedor Front-end React",
-        ddd: "Ex: 11",
-        telefone: "Ex: 99999-9999",
-        cidade: "Ex: São Paulo, SP",
-        linkedin: "seuperfil",
-        portfolio: "Ex: github.com/seuuser",
-        email: "Ex: seuemail@exemplo.com",
-        resumo: "Ex: Desenvolvedor Front-end com 5 anos de experiência em React e TypeScript. Especializado em criar interfaces de usuário responsivas e acessíveis...",
-        curso: "Ex: Bacharelado em Ciência da Computação",
-        instituicao: "Ex: Universidade de São Paulo",
-        periodo: "Ex: 2015 - 2019",
-        cargo: "Ex: Desenvolvedor Front-end React",
-        empresa: "Ex: Google Inc.",
-        tecnologias: "Ex: React, TypeScript, Redux, Node.js",
-        atividades: "Descreva suas responsabilidades (1 item por linha)",
-        resultados: "Ex: Reduzi o tempo de carregamento em 40% através de...",
-        habilidades: "Ex: JavaScript, React, Node.js, HTML/CSS, Git, AWS, Docker",
-        idioma: "Ex: Inglês",
-        certificacao: "Ex: Certificação AWS Cloud Practitioner",
-        linkedin: "seuperfil",
-  github: "seu-usuario",
-  gitlab: "seu-usuario",
-  behance: "seu-usuario",
-  portfolio: "seusite.com",
-  outro: "URL completo"
-},
-      botoes: {
-        adicionarExperiencia: "Adicionar Experiência",
-        adicionarFormacao: "Adicionar Formação",
-        adicionarIdioma: "Adicionar Idioma",
-        adicionarCertificacao: "Adicionar Certificação",
-        gerarCV: "Gerar Currículo em PDF"
-      },
-      mensagens: {
-        nenhumaExperiencia: "Nenhuma experiência adicionada (opcional)",
-        nenhumIdioma: "Nenhum idioma adicionado (opcional)",
-        nenhumaCertificacao: "Nenhuma certificação adicionada (opcional)",
-        sucesso: "Currículo gerado com sucesso!",
-        gerando: "Gerando Currículo..."
-      },
-      secoesPDF: {
-        resumo: "RESUMO",
-        experiencia: "EXPERIÊNCIA",
-        formacao: "FORMAÇÃO",
-        habilidades: "HABILIDADES",
-        idiomas: "IDIOMAS",
-        certificacoes: "CERTIFICAÇÕES"
-      },
-      niveisIdioma: [
-        "Básico", "Intermediário", "Avançado", "Fluente", "Nativo"
-      ]
-    },
-    en: {
-      tituloApp: "Resume Generator",
-      subtituloApp: "Create a professional resume in minutes",
-      dicasATS: "Tips for an ATS-friendly resume",
-      dicasLista: [
-        "Use relevant keywords for the position",
-        "Keep the format simple and readable",
-        "Include metrics and concrete results",
-        "Highlight your main technical skills"
-      ],
-      campos: {
-        nome: "Full Name*",
-        cargoDesejado: "Desired Position",
-        codigoPais: "Country Code",
-        ddd: "Area Code",
-        telefone: "Phone",
-        cidade: "City",
-        linkedin: "LinkedIn",
-        portfolio: "Portfolio/GitHub",
-        email: "Email*",
-        resumo: "Professional Summary*",
-        experiencia: "Professional Experience",
-        formacao: "Education",
-        habilidades: "Technical Skills",
-        idiomas: "Languages",
-        certificacoes: "Certifications",
-        tipoFormacao: "Education Level",
-        curso: "Course",
-        instituicao: "Institution",
-        periodo: "Period",
-        cargo: "Position",
-        empresa: "Company",
-        tecnologias: "Technologies used",
-        atividades: "Responsibilities",
-        resultados: "Achievements (with metrics)",
-        idioma: "Language",
-        nivel: "Level",
-        certificacao: "Certification"
-      },
-      placeholders: {
-        nome: "Ex: John Smith",
-        cargoDesejado: "Ex: React Front-end Developer",
-        ddd: "Ex: 212",
-        telefone: "Ex: 555-123-4567",
-        cidade: "Ex: New York, NY",
-        linkedin: "yourprofile",
-        portfolio: "Ex: github.com/youruser",
-        email: "Ex: your.email@example.com",
-        resumo: "Ex: Front-end Developer with 5 years of experience in React and TypeScript. Specialized in creating responsive and accessible user interfaces...",
-        curso: "Ex: Bachelor's in Computer Science",
-        instituicao: "Ex: University of São Paulo",
-        periodo: "Ex: 2015 - 2019",
-        cargo: "Ex: React Front-end Developer",
-        empresa: "Ex: Google Inc.",
-        tecnologias: "Ex: React, TypeScript, Redux, Node.js",
-        atividades: "Describe your responsibilities (1 item per line)",
-        resultados: "Ex: Reduced loading time by 40% through...",
-        habilidades: "Ex: JavaScript, React, Node.js, HTML/CSS, Git, AWS, Docker",
-        idioma: "Ex: English",
-        certificacao: "Ex: AWS Cloud Practitioner Certification",
-        linkedin: "yourprofile",
-  github: "your-username",
-  gitlab: "your-username",
-  behance: "your-username",
-  portfolio: "yourwebsite.com",
-  outro: "Full URL"
-},
-      botoes: {
-        adicionarExperiencia: "Add Experience",
-        adicionarFormacao: "Add Education",
-        adicionarIdioma: "Add Language",
-        adicionarCertificacao: "Add Certification",
-        gerarCV: "Generate PDF Resume"
-      },
-      mensagens: {
-        nenhumaExperiencia: "No experience added (optional)",
-        nenhumIdioma: "No languages added (optional)",
-        nenhumaCertificacao: "No certifications added (optional)",
-        sucesso: "Resume generated successfully!",
-        gerando: "Generating Resume..."
-      },
-      secoesPDF: {
-        resumo: "SUMMARY",
-        experiencia: "EXPERIENCE",
-        formacao: "EDUCATION",
-        habilidades: "SKILLS",
-        idiomas: "LANGUAGES",
-        certificacoes: "CERTIFICATIONS"
-      },
-      niveisIdioma: [
-        "Basic", "Intermediate", "Advanced", "Fluent", "Native"
-      ]
-    },
-    es: {
-      tituloApp: "Generador de Currículum",
-      subtituloApp: "Crea un currículum profesional en minutos",
-      dicasATS: "Consejos para un currículum compatible con ATS",
-      dicasLista: [
-        "Usa palabras clave relevantes para el puesto",
-        "Mantén el formato simple y legible",
-        "Incluye métricas y resultados concretos",
-        "Destaca tus principales habilidades técnicas"
-      ],
-      campos: {
-        nome: "Nombre Completo*",
-        cargoDesejado: "Puesto Deseado",
-        codigoPais: "Código de País",
-        ddd: "Código de Área",
-        telefone: "Teléfono",
-        cidade: "Ciudad",
-        linkedin: "LinkedIn",
-        portfolio: "Portfolio/GitHub",
-        email: "Email*",
-        resumo: "Resumen Profesional*",
-        experiencia: "Experiencia Profesional",
-        formacao: "Formación Académica",
-        habilidades: "Habilidades Técnicas",
-        idiomas: "Idiomas",
-        certificacoes: "Certificaciones",
-        tipoFormacao: "Nivel de Formación",
-        curso: "Curso",
-        instituicao: "Institución",
-        periodo: "Período",
-        cargo: "Puesto",
-        empresa: "Empresa",
-        tecnologias: "Tecnologías utilizadas",
-        atividades: "Responsabilidades",
-        resultados: "Logros (con métricas)",
-        idioma: "Idioma",
-        nivel: "Nivel",
-        certificacao: "Certificación"
-      },
-      placeholders: {
-        nome: "Ej: Juan Pérez",
-        cargoDesejado: "Ej: Desarrollador Front-end React",
-        ddd: "Ej: 11",
-        telefone: "Ej: 99999-9999",
-        cidade: "Ej: Madrid, España",
-        linkedin: "tuperfil",
-        portfolio: "Ej: github.com/tuusuario",
-        email: "Ej: tu.email@ejemplo.com",
-        resumo: "Ej: Desarrollador Front-end con 5 años de experiencia en React y TypeScript. Especializado en crear interfaces de usuario responsivas y accesibles...",
-        curso: "Ej: Licenciatura en Informática",
-        instituicao: "Ej: Universidad de São Paulo",
-        periodo: "Ej: 2015 - 2019",
-        cargo: "Ej: Desarrollador Front-end React",
-        empresa: "Ej: Google Inc.",
-        tecnologias: "Ej: React, TypeScript, Redux, Node.js",
-        atividades: "Describe tus responsabilidades (1 ítem por línea)",
-        resultados: "Ej: Reduje el tiempo de carga en 40% mediante...",
-        habilidades: "Ej: JavaScript, React, Node.js, HTML/CSS, Git, AWS, Docker",
-        idioma: "Ej: Inglés",
-        certificacao: "Ej: Certificación AWS Cloud Practitioner",
-      linkedin: "superfil",
-  github: "su-usuario",
-  gitlab: "su-usuario",
-  behance: "su-usuario",
-  portfolio: "sutitio.com",
-  outro: "URL completa"
-},
-      botoes: {
-        adicionarExperiencia: "Añadir Experiencia",
-        adicionarFormacao: "Añadir Formación",
-        adicionarIdioma: "Añadir Idioma",
-        adicionarCertificacao: "Añadir Certificación",
-        gerarCV: "Generar CV en PDF"
-      },
-      mensagens: {
-        nenhumaExperiencia: "Ninguna experiencia añadida (opcional)",
-        nenhumIdioma: "Ningún idioma añadido (opcional)",
-        nenhumaCertificacao: "Ninguna certificación añadida (opcional)",
-        sucesso: "¡Currículum generado con éxito!",
-        gerando: "Generando Currículum..."
-      },
-      secoesPDF: {
-        resumo: "RESUMEN",
-        experiencia: "EXPERIENCIA",
-        formacao: "FORMACIÓN",
-        habilidades: "HABILIDADES",
-        idiomas: "IDIOMAS",
-        certificacoes: "CERTIFICACIONES"
-      },
-      niveisIdioma: [
-        "Básico", "Intermedio", "Avanzado", "Fluido", "Nativo"
-      ]
-    }
-  };
-
-
-
-  const paisesTelefone = [
-    { codigo: "+55", nome: "Brasil (+55)" },
-    { codigo: "+1", nome: "EUA/Canadá (+1)" },
-    { codigo: "+54", nome: "Argentina (+54)" },
-    { codigo: "+351", nome: "Portugal (+351)" },
-    { codigo: "+34", nome: "Espanha (+34)" },
-    { codigo: "+49", nome: "Alemanha (+49)" },
-    { codigo: "+33", nome: "França (+33)" },
-    { codigo: "+44", nome: "Reino Unido (+44)" },
-    { codigo: "+39", nome: "Itália (+39)" },
-    { codigo: "+61", nome: "Austrália (+61)" }
-  ];
-
-  const tiposCurso = [
-  { 
-    valor: "superior", 
-    label: "Ensino Superior em",
-    label_en: "Bachelor's Degree in",
-    label_es: "Licenciatura en"
-  },
-  { 
-    valor: "tecnologo", 
-    label: "Tecnólogo em",
-    label_en: "Technology Degree in",
-    label_es: "Tecnólogo en"
-  },
-  { 
-    valor: "medio", 
-    label: "Ensino Médio",
-    label_en: "High School",
-    label_es: "Bachillerato"
-  },
-  { 
-    valor: "tecnico", 
-    label: "Curso Técnico em",
-    label_en: "Technical Course in",
-    label_es: "Curso Técnico en"
-  },
-  { 
-    valor: "pos", 
-    label: "Pós-Graduação em",
-    label_en: "Postgraduate in",
-    label_es: "Posgrado en"
-  },
-  { 
-    valor: "mestrado", 
-    label: "Mestrado em",
-    label_en: "Master's Degree in",
-    label_es: "Máster en"
-  },
-  { 
-    valor: "doutorado", 
-    label: "Doutorado em",
-    label_en: "PhD in",
-    label_es: "Doctorado en"
-  },
+// --- Constantes Globais ---
+const idiomasApp = [
+  { codigo: "pt", nome: "Português", icone: "🇧🇷" },
+  { codigo: "en", nome: "English", icone: "🇺🇸" },
+  { codigo: "es", nome: "Español", icone: "🇪🇸" },
 ];
 
-const [formData, setFormData] = useState({
-  nome: "",
-  telefone: "",
-  ddd: "",
-  codigoPais: "+55",
-  cidade: "",
-  email: "",
-  links: [{ tipo: "linkedin", url: "" }],
-  cargoDesejado: "",
-  resumo: "",
-  experiencias: [],
-  formacoes: [{ 
-    tipo: "superior", 
-    curso: "", 
-    instituicao: "", 
-    mesInicio: "",
-    anoInicio: "",
-    mesFim: "",
-    anoFim: "",
-    emAndamento: false,
-    descricao: "" 
-  }],
-  habilidades: [],
-  certificacoes: [{
-  titulo: "",
-  emissor: "",
-  data: "",
-  cargaHoraria: "",
-  descricao: "",
-  linkValidacao: ""
-}],
-  idiomas: [{ idioma: "", nivel: "" }],
-});
+const paisesTelefone = [
+  { codigo: "+55", nome: "BR (+55)" }, { codigo: "+1", nome: "US/CA (+1)" },
+  { codigo: "+54", nome: "AR (+54)" }, { codigo: "+351", nome: "PT (+351)" },
+  { codigo: "+34", nome: "ES (+34)" }, { codigo: "+44", nome: "UK (+44)" },
+];
 
-const meses = [
-  { valor: "01", label: "Janeiro" },
-  { valor: "02", label: "Fevereiro" },
-  { valor: "03", label: "Março" },
-  { valor: "04", label: "Abril" },
-  { valor: "05", label: "Maio" },
-  { valor: "06", label: "Junho" },
-  { valor: "07", label: "Julho" },
-  { valor: "08", label: "Agosto" },
-  { valor: "09", label: "Setembro" },
-  { valor: "10", label: "Outubro" },
-  { valor: "11", label: "Novembro" },
-  { valor: "12", label: "Dezembro" }
+const tiposCurso = [
+  { valor: "superior", label: "Ensino Superior", label_en: "Bachelor's Degree", label_es: "Grado Universitario" },
+  { valor: "tecnologo", label: "Tecnólogo", label_en: "Associate's Degree", label_es: "Tecnólogo" },
+  { valor: "medio", label: "Ensino Médio", label_en: "High School", label_es: "Bachillerato" },
+  { valor: "tecnico", label: "Curso Técnico", label_en: "Technical Course", label_es: "Curso Técnico" },
+  { valor: "pos", label: "Pós-Graduação", label_en: "Postgraduate", label_es: "Posgrado" },
+  { valor: "mestrado", label: "Mestrado", label_en: "Master's Degree", label_es: "Máster" },
+  { valor: "doutorado", label: "Doutorado", label_en: "PhD/Doctorate", label_es: "Doctorado" },
 ];
 
 const statusFormacao = [
-  { valor: "completo", label: "Completo" },
-  { valor: "andamento", label: "Em andamento" },
-  { valor: "trancado", label: "Trancado" }
+  { valor: "completo", label: "Completo", label_en: "Completed", label_es: "Completo" },
+  { valor: "andamento", label: "Em andamento", label_en: "In Progress", label_es: "En curso" },
+  { valor: "trancado", label: "Interrompido", label_en: "Interrupted", label_es: "Interrumpido" }
 ];
 
-const tiposRedesSociais = [
+const tiposLinks = [
   { valor: "linkedin", label: "LinkedIn", prefixo: "linkedin.com/in/" },
   { valor: "github", label: "GitHub", prefixo: "github.com/" },
   { valor: "gitlab", label: "GitLab", prefixo: "gitlab.com/" },
   { valor: "behance", label: "Behance", prefixo: "behance.net/" },
   { valor: "portfolio", label: "Portfolio", prefixo: "" },
-  { valor: "outro", label: "outro", prefixo: "" },
+  { valor: "outro", label: "Outro", prefixo: "" },
 ];
 
-  const [errors, setErrors] = useState({});
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [habilidadesInput, setHabilidadesInput] = useState("");
-  const [idiomaApp, setIdiomaApp] = useState("pt");
-  const [activeSection, setActiveSection] = useState("info");
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showGenerationAnimation, setShowGenerationAnimation] = useState(false);
-  const [showQRCode, setShowQRCode] = useState(false);
-  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+const meses = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
 
-  // Obter textos traduzidos com base no idioma selecionado
-  const t = textos[idiomaApp];
-
-const validateForm = () => {
-  const newErrors = {};
-  let firstErrorSection = null;
-  
-  // Validação do nome (seção "info")
-  if (!formData.nome.trim()) {
-    newErrors.nome = t.campos.nome.replace("*", "") + " é obrigatório";
-    if (!firstErrorSection) firstErrorSection = "info";
-  }
-  
-  // Validação do email (seção "info")
-  if (!formData.email.trim()) {
-    newErrors.email = t.campos.email.replace("*", "") + " é obrigatório";
-    if (!firstErrorSection) firstErrorSection = "info";
-  } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
-    newErrors.email = "Email inválido";
-    if (!firstErrorSection) firstErrorSection = "info";
-  }
-  
-  // Validação do resumo (seção "resumo")
-  if (!formData.resumo.trim()) {
-    newErrors.resumo = t.campos.resumo.replace("*", "") + " é obrigatório";
-    if (!firstErrorSection) firstErrorSection = "resumo";
-  }
-  
-  // Removida a validação das formações
-  
-  setErrors(newErrors);
-  
-  return {
-    isValid: Object.keys(newErrors).length === 0,
-    firstErrorSection
-  };
+const sanitizeInput = (text) => {
+  if (typeof text !== 'string') return "";
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
 };
 
-const handleChange = (e) => {
-  const { name, value } = e.target;
-  setFormData(prev => {
-    const newData = { ...prev, [name]: value };
-    saveFormDataToLocalStorage(newData);
-    return newData;
-  });
-};
-
-const handleArrayChange = (field, index, name, value) => {
-  setFormData(prev => {
-    const newArray = [...prev[field]];
-    newArray[index] = { ...newArray[index], [name]: value };
-    const newData = { ...prev, [field]: newArray };
-    saveFormDataToLocalStorage(newData);
-    return newData;
-  });
-};
-
-const addField = (field, initialValue = "") => {
-  setFormData(prev => {
-    const newArray = [...prev[field], typeof initialValue === "object" ? { ...initialValue } : initialValue];
-    const newData = { ...prev, [field]: newArray };
-    saveFormDataToLocalStorage(newData);
-    return newData;
-  });
-};
-
-const removeField = (field, index) => {
-  setFormData(prev => {
-    const newArray = [...prev[field]];
-    newArray.splice(index, 1);
-    
-    if (field === "certificacoes" && newArray.length === 0) {
-      newArray.push({ 
-        titulo: "", 
-        emissor: "", 
-        data: "", 
-        cargaHoraria: "", 
-        descricao: "" 
-      });
-    }
-    
-    const newData = { ...prev, [field]: newArray };
-    saveFormDataToLocalStorage(newData);
-    return newData;
-  });
-};
-
-  const handleHabilidadesChange = (e) => {
-    const value = e.target.value;
-    setHabilidadesInput(value);
-    
-    const habilidadesArray = value.split(",")
-      .map(skill => skill.trim())
-      .filter(skill => skill);
-    
-    setFormData(prev => ({ ...prev, habilidades: habilidadesArray }));
-  };
-
-  const formatarTextoParaPDF = (text, maxWidth, font, fontSize) => {
-  if (!text) return [''];
-  
-  const paragraphs = text.split('\n');
-  let lines = [];
-  
-  for (const paragraph of paragraphs) {
-    const words = paragraph.split(' ');
-    let currentLine = words[0] || '';
-    
-    for (let i = 1; i < words.length; i++) {
-      const word = words[i];
-      const testLine = currentLine + ' ' + word;
-      const width = font.widthOfTextAtSize(testLine, fontSize);
-      
-      if (width < maxWidth) {
-        currentLine = testLine;
-      } else {
-        lines.push(currentLine);
-        currentLine = word;
-      }
-    }
-    
-    if (currentLine) {
-      lines.push(currentLine);
-    }
-  }
-  
-  return lines;
-};
-
- const [showLoadedMessage, setShowLoadedMessage] = useState(false);
-
-const saveFormDataToLocalStorage = (data) => {
-    try {
-      localStorage.setItem('resumeFormData', JSON.stringify(data));
-    } catch (error) {
-      console.error('Failed to save form data', error);
-    }
-  };
-
-  useEffect(() => {
-  if (showLoadedMessage) {
-    const timer = setTimeout(() => setShowLoadedMessage(false), 4000);
-    return () => clearTimeout(timer);
-  }
-}, [showLoadedMessage]);
-
-
-  useEffect(() => {
-    const savedFormData = localStorage.getItem('resumeFormData');
-    if (savedFormData) {
-      try {
-        const parsedData = JSON.parse(savedFormData);
-        setFormData(parsedData);
-        setShowLoadedMessage(true);
-        setTimeout(() => setShowLoadedMessage(false), 3000);
-      } catch (error) {
-        console.error('Failed to parse saved form data', error);
-      }
-    }
-  }, []);
-
-
-const gerarPDF = async () => {
-  const validation = validateForm();
-  
-  if (!validation.isValid) {
-    if (validation.firstErrorSection) {
-      setActiveSection(validation.firstErrorSection);
-      setTimeout(() => {
-        const sectionElement = document.getElementById(validation.firstErrorSection);
-        if (sectionElement) {
-          sectionElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 100);
-    }
-    return;
-  }
-
-
-const formatarMes = (numeroMes, idioma = 'pt') => {  // 'pt' como padrão
-  const meses = {
-    pt: [
-      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-    ],
-    en: [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ],
-    es: [
-      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-    ]
-  };
-  
-  const idiomaValido = meses[idioma] ? idioma : 'pt';
-  return meses[idiomaValido][parseInt(numeroMes) - 1] || '';
-};
-
-
-
-  setIsGenerating(true);
-  setShowGenerationAnimation(true);
-
-  await new Promise(resolve => setTimeout(resolve, 2000));
-
-  setShowPaymentModal(true);
-  
-  try {
-    // Criar novo documento PDF
-    const pdfDoc = await PDFDocument.create();
-    let page = pdfDoc.addPage([595, 842]); // Tamanho A4 em pontos (72dpi)
-    const { width, height } = page.getSize();
-    
-    // Configurações de fonte
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const black = rgb(0, 0, 0);
-    
-    // Margens e layout otimizados
-    const marginX = 50;
-    const marginY = 40; // Margem superior reduzida
-    const maxWidth = width - 2 * marginX;
-    let y = height - marginY;
-    const lineHeight = 12; // Altura de linha reduzida
-    const sectionGap = 10; // Espaço entre seções reduzido
-    const minY = marginY + 30;
-    
-    // Função para desenhar texto com quebra de linha automática (otimizada)
-    const drawText = (text, x, y, size, maxWidth, font, color, lineHeightMultiplier = 1.2) => {
-      const lines = formatarTextoParaPDF(text, maxWidth, font, size);
-      lines.forEach((line, i) => {
-        page.drawText(line, {
-          x,
-          y: y - (i * (size * lineHeightMultiplier)),
-          size,
-          font,
-          color,
-        });
-      });
-      return lines.length;
-    };
-    
-    // Função para verificar se precisa de nova página
-const checkForNewPage = (requiredSpace = lineHeight) => {
-  if (y - requiredSpace < minY) {
-    const newPage = pdfDoc.addPage([595, 842]);
-    y = height - marginY;
-    return newPage; // Retorna a nova página
-  }
-  return page; // Retorna a página atual
-};
-    
-    // Função para desenhar título de seção (mais compacta)
-    const drawSectionTitle = (title) => {
-      
-      const newPage = checkForNewPage(lineHeight * 1.5);
-if (newPage !== page) {
-  page = newPage;
-}
-
-      page.drawText(title.toUpperCase(), {
-        x: marginX,
-        y,
-        size: 11, // Tamanho reduzido
-        font: boldFont,
-        color: black,
-      });
-      // Linha divisória fina
-      page.drawLine({
-        start: { x: marginX, y: y - 2 },
-        end: { x: marginX + 50, y: y - 2 },
-        thickness: 1,
-        color: black,
-      });
-      y -= lineHeight * 1.2;
-    };
-    
-    // 1. Cabeçalho (Nome e Cargo) - mais compacto
-    const nome = sanitizeForATS(formData.nome);
-    const cargo = sanitizeForATS(formData.cargoDesejado || '');
-    
-    const newPage = checkForNewPage(lineHeight * 2);
-if (newPage !== page) {
-  page = newPage;
-}
-
-    page.drawText(nome.toUpperCase(), {
-      x: marginX,
-      y,
-      size: 16, // Tamanho reduzido
-      font: boldFont,
-      color: black,
-    });
-    y -= lineHeight * 1.5;
-    
-    if (cargo) {
-      page.drawText(cargo, {
-        x: marginX,
-        y,
-        size: 12, // Tamanho reduzido
-        font,
-        color: black,
-      });
-      y -= lineHeight * 1.2;
-    }
-    
-    // 2. Informações de Contato (mais compacto)
-    const contactInfo = [
-  formData.telefone && `${formData.codigoPais} ${formData.ddd} ${formData.telefone}`,
-  formData.email,
-  formData.cidade,
-  ...formData.links
-    .filter(link => link.url)
-    .map(link => {
-      const rede = tiposRedesSociais.find(t => t.valor === link.tipo);
-      if (link.tipo === 'outro') {
-        return link.url; // Mostra apenas a URL para tipo "outro"
-      }
-      return rede ? `${rede.label}: ${rede.prefixo}${link.url}` : link.url;
-    })
-].filter(Boolean).join(" • ");
-    
-    const contactLines = drawText(
-      sanitizeForATS(contactInfo),
-      marginX,
-      y,
-      9, // Tamanho de fonte menor
-      maxWidth,
-      font,
-      black,
-      1.1 // Espaçamento reduzido
-    );
-    y -= contactLines * (9 * 1.1);
-    y -= 8; // Espaço reduzido
-    
-    // 3. Resumo Profissional (mais compacto)
-    if (formData.resumo) {
-      drawSectionTitle(t.secoesPDF.resumo);
-      const resumoLines = drawText(
-        sanitizeForATS(formData.resumo),
-        marginX,
-        y,
-        10, // Tamanho de fonte menor
-        maxWidth,
-        font,
-        black,
-        1.1 // Espaçamento reduzido
-      );
-      y -= resumoLines * (10 * 1.1);
-      y -= sectionGap;
-    }
-
-    
-if (formData.experiencias.length > 0) {
-  drawSectionTitle(t.secoesPDF.experiencia);
-  
-  formData.experiencias.forEach((exp, idx) => {
-    // Formata o período
-    const mesInicio = formatarMes(exp.mesInicio);
-    const mesFim = formatarMes(exp.mesFim);
-    
-const periodoExp = [
-  exp.mesInicio && `${formatarMes(exp.mesInicio, idiomaApp)} ${exp.anoInicio}`,
-  exp.atual ? 
-    (idiomaApp === 'en' ? 'Present' : 
-     idiomaApp === 'es' ? 'Actual' : 'Atual') : 
-    (exp.mesFim && exp.anoFim ? `${formatarMes(exp.mesFim, idiomaApp)} ${exp.anoFim}` : "")
-].filter(Boolean).join(" - ");
-
-const headerParts = [
-  exp.cargo && `${exp.cargo}`,
-  exp.empresa && `, ${exp.empresa}`,
-  periodoExp && ` (${periodoExp})`
-].filter(Boolean);
-
-const header = headerParts.join('');
-
-    const newPage = checkForNewPage(lineHeight * 1.5);
-if (newPage !== page) {
-  page = newPage;
-}
-
-    const headerLines = drawText(
-      sanitizeForATS(header),
-      marginX,
-      y,
-      10,
-      maxWidth,
-      boldFont,
-      black,
-      1.1
-    );
-    y -= headerLines * (10 * 1.1);
-
-    // Tecnologias (mantido igual)
-    if (exp.tecnologias) {
-      const techText = `Tecnologias: ${exp.tecnologias}`;
-      const techLines = drawText(
-        sanitizeForATS(techText),
-        marginX + 10,
-        y,
-        9,
-        maxWidth - 10,
-        font,
-        black,
-        1.1
-      );
-      y -= techLines * (9 * 1.1);
-    }
-
-    // Atividades (mantido igual)
-    if (exp.atividades) {
-      const atividades = exp.atividades.split('\n')
-        .filter(a => a.trim())
-        .map(a => a.trim().replace(/^[-•*]\s*/, ''));
-      
-      if (atividades.length > 0) {
-        atividades.forEach(atividade => {
-
-          const newPage = checkForNewPage();
-if (newPage !== page) {
-  page = newPage;
-}
-
-          page.drawText('•', {
-            x: marginX,
-            y: y + 1,
-            size: 9,
-            font,
-            color: black,
-          });
-          const lines = drawText(
-            sanitizeForATS(atividade),
-            marginX + 8,
-            y,
-            9,
-            maxWidth - 8,
-            font,
-            black,
-            1.1
-          );
-          y -= lines * (9 * 1.1);
-        });
-      }
-    }
-
-    // Resultados (mantido igual)
-    if (exp.resultados) {
-      const resultados = exp.resultados.split('\n')
-        .filter(r => r.trim())
-        .map(r => r.trim().replace(/^[-•*]\s*/, ''));
-      
-      if (resultados.length > 0) {
-        resultados.forEach(resultado => {
-          const newPage = checkForNewPage();
-if (newPage !== page) {
-  page = newPage;
-}
-          page.drawText('•', {
-            x: marginX,
-            y: y + 1,
-            size: 9,
-            font,
-            color: black,
-          });
-          const lines = drawText(
-            sanitizeForATS(resultado),
-            marginX + 8,
-            y,
-            9,
-            maxWidth - 8,
-            font,
-            black,
-            1.1
-          );
-          y -= lines * (9 * 1.1);
-        });
-      }
-    }
-
-    if (idx < formData.experiencias.length - 1) {
-      y -= 6;
-      const newPage = checkForNewPage();
-if (newPage !== page) {
-  page = newPage;
-}
-    }
-  });
-  y -= sectionGap;
-}
-    
-
-// 5. Formação Acadêmica (compacta)
-if (formData.formacoes.some(f => f.curso || f.instituicao)) {
-  drawSectionTitle(t.secoesPDF.formacao);
-  
-  formData.formacoes.forEach(form => {
-    if (form.curso || form.instituicao) {
-      const tipoCurso = tiposCurso.find(t => t.valor === form.tipo);
-      let tipoFormacao = tipoCurso?.label || '';
-
-      if (idiomaApp === 'en') {
-        tipoFormacao = tipoCurso?.label_en || tipoCurso?.label || '';
-      } else if (idiomaApp === 'es') {
-        tipoFormacao = tipoCurso?.label_es || tipoCurso?.label || '';
-      }
-
-      const mesInicio = formatarMes(form.mesInicio, idiomaApp);
-      const mesFim = formatarMes(form.mesFim, idiomaApp);
-
-      let periodoFormatado = '';
-      if (form.status === "andamento") {
-        periodoFormatado = `${mesInicio} ${form.anoInicio} - ${
-          idiomaApp === 'en' ? 'Present' : 
-          idiomaApp === 'es' ? 'Actual' : 'Presente'
-        }`;
-      } else if (form.status === "trancado") {
-        periodoFormatado = `${mesInicio} ${form.anoInicio} - ${
-          idiomaApp === 'en' ? 'On hold' : 
-          idiomaApp === 'es' ? 'En pausa' : 'Trancado'
-        }`;
-      } else if (form.mesFim && form.anoFim) {
-        periodoFormatado = `${mesInicio} ${form.anoInicio} - ${mesFim} ${form.anoFim}`;
-      } else {
-        periodoFormatado = `${mesInicio} ${form.anoInicio}`;
-      }
-
-// Linha 1: Tipo de formação + curso (se houver)
-const newPage = checkForNewPage();
-if (newPage !== page) {
-  page = newPage;
-}
-const linha1 = form.curso ? `${tipoFormacao} ${form.curso}` : tipoFormacao;
-page.drawText(linha1, {
-  x: marginX,
-  y,
-  size: 10,
-  font: boldFont,
-  color: black,
-});
-y -= lineHeight * 1.1;
-
-      // Linha 2: Instituição (só se existir)
-      if (form.instituicao) {
-        const newPage = checkForNewPage();
-if (newPage !== page) {
-  page = newPage;
-}
-        page.drawText(form.instituicao, {
-          x: marginX,
-          y,
-          size: 9,
-          font: font,
-          color: black,
-        });
-        y -= lineHeight * 1.1;
-      }
-
-      // Linha 3: Período
-      checkForNewPage();
-      page.drawText(periodoFormatado, {
-        x: marginX,
-        y,
-        size: 9,
-        font: font,
-        color: black,
-      });
-      y -= lineHeight * 1.1;
-
-      // Descrição (se existir)
-      if (form.descricao) {
-        y -= 4; // Espaço antes da descrição
-        const descLines = drawText(
-          sanitizeForATS(form.descricao),
-          marginX,
-          y,
-          8, // Tamanho de fonte menor para descrição
-          maxWidth,
-          font,
-          black,
-          1.1
-        );
-        y -= descLines * (8 * 1.1);
-      }
-
-      y -= 8; // Espaço entre formações
-    }
-  });
-  y -= sectionGap;
-}
-
-    
-    // 6. Habilidades Técnicas (em colunas)
-    if (formData.habilidades.length > 0) {
-      drawSectionTitle(t.secoesPDF.habilidades);
-      
-      // Remover duplicatas e ordenar
-      const uniqueSkills = [...new Set(formData.habilidades
-        .map(s => s.trim())
-        .filter(s => s.length > 0))];
-      
-      // Dividir habilidades em 2 colunas para economizar espaço
-      const middleIndex = Math.ceil(uniqueSkills.length / 2);
-      const column1 = uniqueSkills.slice(0, middleIndex);
-      const column2 = uniqueSkills.slice(middleIndex);
-      
-      const columnWidth = (maxWidth - 10) / 2; // 10px de espaço entre colunas
-      let currentY = y;
-      
-      // Desenhar coluna 1
-      column1.forEach(skill => {
-        const newPage = checkForNewPage();
-if (newPage !== page) {
-  page = newPage;
-}
-        page.drawText('•', {
-          x: marginX,
-          y: currentY + 1,
-          size: 9,
-          font,
-          color: black,
-        });
-        drawText(
-          sanitizeForATS(skill),
-          marginX + 8,
-          currentY,
-          9,
-          columnWidth - 8,
-          font,
-          black,
-          1.1
-        );
-        currentY -= 9 * 1.1;
-      });
-      
-      // Desenhar coluna 2 (se houver)
-      if (column2.length > 0) {
-        currentY = y; // Reset para topo
-        column2.forEach(skill => {
-          const newPage = checkForNewPage();
-if (newPage !== page) {
-  page = newPage;
-}
-          page.drawText('•', {
-            x: marginX + columnWidth + 10,
-            y: currentY + 1,
-            size: 9,
-            font,
-            color: black,
-          });
-          drawText(
-            sanitizeForATS(skill),
-            marginX + columnWidth + 18,
-            currentY,
-            9,
-            columnWidth - 8,
-            font,
-            black,
-            1.1
-          );
-          currentY -= 9 * 1.1;
-        });
-      }
-      
-      y = currentY;
-      y -= sectionGap;
-    }
-    
-    // 7. Idiomas (compacto)
-    if (formData.idiomas.some(i => i.idioma)) {
-      drawSectionTitle(t.secoesPDF.idiomas);
-      
-      formData.idiomas.forEach(idioma => {
-        if (idioma.idioma) {
-          const text = [
-            idioma.idioma,
-            idioma.nivel && `(${idioma.nivel})`
-          ].filter(Boolean).join(" ");
-          const newPage = checkForNewPage();
-if (newPage !== page) {
-  page = newPage;
-}
-          page.drawText('•', {
-            x: marginX,
-            y: y + 1,
-            size: 9,
-            font,
-            color: black,
-          });
-          const lines = drawText(
-            sanitizeForATS(text),
-            marginX + 8,
-            y,
-            9,
-            maxWidth - 8,
-            font,
-            black,
-            1.1
-          );
-          y -= lines * (9 * 1.1);
-        }
-      });
-      y -= sectionGap;
-    }
-    
-if (formData.certificacoes.some(c => c.titulo && c.titulo.trim())) {
-  drawSectionTitle(t.secoesPDF.certificacoes);
-  
-  formData.certificacoes
-    .filter(c => c.titulo && c.titulo.trim())
-    .forEach(cert => {
-      const newPage = checkForNewPage();
-      if (newPage !== page) {
-        page = newPage;
-      }
-      
-      // Título e Emissor
-      const tituloEmissor = [
-        cert.titulo,
-        cert.emissor && `(${cert.emissor})`
-      ].filter(Boolean).join(" ");
-      
-      page.drawText('•', {
-        x: marginX,
-        y: y + 1,
-        size: 9,
-        font,
-        color: black,
-      });
-      
-      const lines1 = drawText(
-        sanitizeForATS(tituloEmissor),
-        marginX + 8,
-        y,
-        9,
-        maxWidth - 8,
-        font,
-        black,
-        1.1
-      );
-      y -= lines1 * (9 * 1.1);
-      
-      // Data e Carga Horária
-      if (cert.data || cert.cargaHoraria) {
-        const dataCarga = [
-          cert.data,
-          cert.cargaHoraria && `- ${cert.cargaHoraria}`
-        ].filter(Boolean).join(" ");
-        
-        const lines2 = drawText(
-          sanitizeForATS(dataCarga),
-          marginX + 8,
-          y,
-          8,
-          maxWidth - 8,
-          font,
-          rgb(0.3, 0.3, 0.3),
-          1.1
-        );
-        y -= lines2 * (8 * 1.1);
-      }
-
-      // Link de validação (se existir)
-      if (cert.linkValidacao) {
-        const linkText = `Link de validação: ${cert.linkValidacao}`;
-        const lines3 = drawText(
-          sanitizeForATS(linkText),
-          marginX + 8,
-          y,
-          8,
-          maxWidth - 8,
-          font,
-          rgb(0, 0, 0.8), // Azul mais escuro para links
-          1.1
-        );
-        y -= lines3 * (8 * 1.1);
-      }
-      
-      // Descrição
-      if (cert.descricao) {
-        const descLines = drawText(
-          sanitizeForATS(cert.descricao),
-          marginX + 8,
-          y,
-          8,
-          maxWidth - 8,
-          font,
-          black,
-          1.1
-        );
-        y -= descLines * (8 * 1.1);
-      }
-      
-      y -= 4;
-    });
-}
-    
-    // Gerar e baixar o PDF
-    const pdfBytes = await pdfDoc.save();
-    const blob = new Blob([pdfBytes], { type: "application/pdf" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `CV_${formData.nome.replace(/\s+/g, '_')}_ATS.pdf`;
-    link.click();
-    
-    setSuccessMessage(t.mensagens.sucesso);
-    setTimeout(() => setSuccessMessage(""), 10000);
-    
-  } catch (error) {
-    console.error("Erro ao gerar PDF:", error);
-  } finally {
-    setIsGenerating(false);
-    setShowGenerationAnimation(false);
-  }
-};
-
-
-
-const renderExperienceFields = () => {
-  return formData.experiencias.map((exp, idx) => (
-    <div key={idx} className="mb-8 p-4 sm:p-6 bg-white rounded-xl shadow-md border border-gray-100 relative">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t.campos.cargo}</label>
-          <input
-            type="text"
-            value={exp.cargo}
-            onChange={(e) => handleArrayChange("experiencias", idx, "cargo", e.target.value)}
-            className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            placeholder={t.placeholders.cargo}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t.campos.empresa}</label>
-          <input
-            type="text"
-            value={exp.empresa}
-            onChange={(e) => handleArrayChange("experiencias", idx, "empresa", e.target.value)}
-            className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            placeholder={t.placeholders.empresa}
-          />
-        </div>
+// --- Componentes UI (Estilo SAAS - Refinado) ---
+const SectionCard = React.memo(({ children, title, className = "" }) => (
+  <div className={`bg-white rounded-lg border border-gray-200 shadow-sm mb-6 overflow-hidden transition-shadow duration-200 hover:shadow-md ${className}`}>
+    {title && (
+      <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/80">
+        <h3 className="text-lg font-semibold text-gray-800 tracking-tight">{title}</h3>
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4 mb-4">
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-2">Mês Início</label>
+    )}
+    <div className="p-5 md:p-6">
+      {children}
+    </div>
+  </div>
+));
+
+const ItemCard = React.memo(({ children, onRemove, removeTitle, summaryHeader, index }) => (
+  <div className="bg-white rounded-lg border border-gray-200/80 relative shadow-sm hover:shadow-lg hover:border-gray-300 transition-all duration-200 ease-in-out mb-5 overflow-hidden group">
+    {summaryHeader && (
+      <div className="bg-gray-50/70 px-5 py-3 border-b border-gray-200/80 flex justify-between items-center">
+        <div className="flex-grow mr-4 overflow-hidden text-sm">{summaryHeader}</div>
+        <RemoveButton onClick={onRemove} title={removeTitle} />
+      </div>
+    )}
+    <div className="p-5 space-y-4">
+      {!summaryHeader && (
+         <RemoveButton onClick={onRemove} title={removeTitle} className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
+      )}
+      {children}
+    </div>
+  </div>
+));
+
+const InputField = React.memo(({ label, name, placeholder, value, onChange, error, warning, type = "text", icon = null, className = "", id }) => (
+  <div className={`relative ${className}`}>
+    <label htmlFor={id || name} className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+    <div className="relative rounded-md shadow-sm">
+      {icon && <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 text-base">{icon}</div>}
+      <input
+        type={type}
+        id={id || name}
+        name={name}
+        value={value || ""}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={`block w-full px-4 py-2 border rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-300 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out ${icon ? "pl-10" : "pl-4"} ${error ? "border-red-400 ring-red-300" : warning ? "border-yellow-400 ring-yellow-300" : "border-gray-300 focus:border-indigo-500"}`}
+        aria-invalid={!!error}
+        aria-describedby={error ? `${id || name}-error` : undefined}
+      />
+    </div>
+    {error && <p id={`${id || name}-error`} className="text-xs text-red-600 mt-1.5">{error}</p>}
+    {warning && !error && <p className="text-xs text-yellow-600 mt-1.5">Campo recomendado.</p>}
+  </div>
+));
+
+const TextareaField = React.memo(({ label, name, placeholder, value, onChange, warning, rows = 4, className = "", id }) => (
+  <div className={className}>
+    {label && <label htmlFor={id || name} className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>}
+    <textarea
+      id={id || name}
+      name={name}
+      value={value || ""}
+      onChange={onChange}
+      placeholder={placeholder}
+      rows={rows}
+      className={`block w-full px-4 py-2 border rounded-md shadow-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-300 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out ${warning ? "border-yellow-400 ring-yellow-300" : "border-gray-300 focus:border-indigo-500"}`}
+    />
+     {warning && <p className="text-xs text-yellow-600 mt-1.5">Campo recomendado.</p>}
+  </div>
+));
+
+const SelectField = React.memo(({ label, name, value, onChange, options, className = "", defaultOptionLabel = "Selecione...", id }) => (
+  <div className={className}>
+    <label htmlFor={id || name} className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
     <select
-      value={exp.mesInicio}
-      onChange={(e) => handleArrayChange("experiencias", idx, "mesInicio", e.target.value)}
-      className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+      id={id || name}
+      name={name}
+      value={value || ""}
+      onChange={onChange}
+      className="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-300 focus:border-indigo-500 sm:text-sm rounded-md appearance-none bg-white bg-no-repeat bg-right pr-8 transition duration-150 ease-in-out"
+      style={{ backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20"><path stroke="%236b7280" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 8l4 4 4-4"/></svg>')`, backgroundPosition: "right 0.5rem center", backgroundSize: "1.25em 1.25em" }}
     >
-      <option value="">Selecione</option>
-      {meses.map(mes => (
-        <option key={mes.valor} value={mes.valor}>{mes.label}</option>
+      <option value="" disabled>{defaultOptionLabel}</option>
+      {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+    </select>
+  </div>
+));
+
+const AddItemButton = React.memo(({ onClick, label }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="mt-4 text-sm text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1.5 group transition-all duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-md px-3 py-1.5 hover:bg-indigo-50 active:bg-indigo-100"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+    </svg>
+    {label}
+  </button>
+));
+
+const RemoveButton = React.memo(({ onClick, title, className = "" }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`text-gray-400 hover:text-red-600 font-bold text-xl rounded-full w-7 h-7 flex items-center justify-center hover:bg-red-100 active:bg-red-200 transition-all duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 ${className}`}
+    title={title}
+    aria-label={title}
+  >
+    &times;
+  </button>
+));
+
+const PrimaryButton = React.memo(({ onClick, label, isLoading = false, disabled = false, className = "" }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={isLoading || disabled}
+    className={`w-full flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150 ease-in-out ${className}`}
+  >
+    {isLoading ? (
+      <>
+        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        {/* Usar tradução aqui se disponível */} Aguarde...
+      </>
+    ) : (
+      label
+    )}
+  </button>
+));
+
+const SkillTag = React.memo(({ skill, onRemove }) => (
+  <div className="inline-flex items-center bg-indigo-100 text-indigo-800 rounded-full px-3 py-1 text-sm font-medium mr-2 mb-2 shadow-sm hover:shadow-md hover:bg-indigo-200 transition-all duration-150 ease-in-out">
+    <span>{skill}</span>
+    {onRemove && (
+      <button
+        onClick={() => onRemove(skill)}
+        className="ml-1.5 -mr-0.5 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-300 rounded-full p-0.5 transition-colors focus:outline-none focus:ring-1 focus:ring-indigo-400"
+        aria-label={`Remover ${skill}`}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    )}
+  </div>
+));
+
+const LanguageSelector = React.memo(({ currentLang, onChangeLang }) => (
+  <div className="relative">
+    <select
+      value={currentLang}
+      onChange={(e) => onChangeLang(e.target.value)}
+      className="bg-white border border-gray-300 rounded-md shadow-sm pl-3 pr-8 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 appearance-none hover:border-gray-400 transition-colors duration-150"
+      style={{ backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20"><path stroke="%236b7280" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 8l4 4 4-4"/></svg>')`, backgroundPosition: "right 0.3rem center", backgroundSize: "1.1em 1.1em" }}
+    >
+      {idiomasApp.map(lang => (
+        <option key={lang.codigo} value={lang.codigo}>{lang.icone} {lang.nome}</option>
       ))}
     </select>
   </div>
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-2">Ano Início</label>
-    <input
-      type="number"
-      min="1900"
-      max={new Date().getFullYear()}
-      value={exp.anoInicio}
-      onChange={(e) => handleArrayChange("experiencias", idx, "anoInicio", e.target.value)}
-      className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-      placeholder="Ano"
-    />
-  </div>
-  
-  {/* Campos de término - agora condicionais */}
-  {!exp.atual && (
-    <>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Mês Término</label>
-        <select
-          value={exp.mesFim}
-          onChange={(e) => handleArrayChange("experiencias", idx, "mesFim", e.target.value)}
-          className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-        >
-          <option value="">Selecione</option>
-          {meses.map(mes => (
-            <option key={mes.valor} value={mes.valor}>{mes.label}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Ano Término</label>
-        <input
-          type="number"
-          min="1900"
-          max={new Date().getFullYear()}
-          value={exp.anoFim}
-          onChange={(e) => handleArrayChange("experiencias", idx, "anoFim", e.target.value)}
-          className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-          placeholder="Ano"
-        />
-      </div>
-    </>
-  )}
-  
-  {/* Checkbox "Atual" estilizado */}
-  <div className={`flex items-center ${exp.atual ? 'md:col-span-2' : ''}`}>
-    <label className="inline-flex items-center mt-6 cursor-pointer">
-      <input
-        type="checkbox"
-        checked={exp.atual}
-        onChange={(e) => {
-          handleArrayChange("experiencias", idx, "atual", e.target.checked);
-          // Limpa campos de término se marcar como atual
-          if (e.target.checked) {
-            handleArrayChange("experiencias", idx, "mesFim", "");
-            handleArrayChange("experiencias", idx, "anoFim", "");
-          }
-        }}
-        className="sr-only peer"
-      />
-      <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-      <span className="ms-3 text-sm font-medium text-gray-700">Atual</span>
-    </label>
-  </div>
-</div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t.campos.tecnologias}</label>
-          <input
-            type="text"
-            value={exp.tecnologias}
-            onChange={(e) => handleArrayChange("experiencias", idx, "tecnologias", e.target.value)}
-            className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            placeholder={t.placeholders.tecnologias}
-          />
-        </div>
-      </div>
-      
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">{t.campos.atividades}</label>
-        <textarea
-          value={exp.atividades}
-          onChange={(e) => handleArrayChange("experiencias", idx, "atividades", e.target.value)}
-          className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-          rows={3}
-          placeholder={t.placeholders.atividades}
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">{t.campos.resultados}</label>
-        <textarea
-          value={exp.resultados}
-          onChange={(e) => handleArrayChange("experiencias", idx, "resultados", e.target.value)}
-          className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-          rows={3}
-          placeholder={t.placeholders.resultados}
-        />
-      </div>
-      
-      <button
-        type="button"
-        onClick={() => removeField("experiencias", idx)}
-        className="absolute top-2 right-2 sm:top-4 sm:right-4 text-gray-500 hover:text-red-500 transition-colors"
-        title="Remover experiência"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-        </svg>
-      </button>
-    </div>
-  ));
-};
+));
 
-const renderEducationFields = () => {
-  return formData.formacoes.map((form, idx) => (
-    <div key={idx} className="mb-8 p-4 sm:p-6 bg-white rounded-xl shadow-md border border-gray-100 relative">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t.campos.tipoFormacao}</label>
-          <select
-            value={form.tipo}
-            onChange={(e) => handleArrayChange("formacoes", idx, "tipo", e.target.value)}
-            className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-          >
-            {tiposCurso.map(tipo => (
-              <option key={tipo.valor} value={tipo.valor}>{tipo.label}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-          <select
-            value={form.status || "completo"}
-            onChange={(e) => handleArrayChange("formacoes", idx, "status", e.target.value)}
-            className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-          >
-            {statusFormacao.map(status => (
-              <option key={status.valor} value={status.valor}>{status.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t.campos.curso}</label>
-          <input
-            type="text"
-            value={form.curso}
-            onChange={(e) => handleArrayChange("formacoes", idx, "curso", e.target.value)}
-            className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            placeholder={t.placeholders.curso}
-          />
-         
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t.campos.instituicao}</label>
-          <input
-            type="text"
-            value={form.instituicao}
-            onChange={(e) => handleArrayChange("formacoes", idx, "instituicao", e.target.value)}
-            className={`w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-              errors[`formacao_instituicao_${idx}`] ? "border-red-500" : ""
-            }`}
-            placeholder={t.placeholders.instituicao}
-          />
-          {errors[`formacao_instituicao_${idx}`] && (
-            <p className="text-red-500 text-xs mt-2">{errors[`formacao_instituicao_${idx}`]}</p>
-          )}
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Mês Início</label>
-          <select
-            value={form.mesInicio}
-            onChange={(e) => handleArrayChange("formacoes", idx, "mesInicio", e.target.value)}
-            className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-          >
-            <option value="">Selecione</option>
-            {meses.map(mes => (
-              <option key={mes.valor} value={mes.valor}>{mes.label}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Ano Início</label>
-          <input
-            type="number"
-            min="1900"
-            max={new Date().getFullYear()}
-            value={form.anoInicio}
-            onChange={(e) => handleArrayChange("formacoes", idx, "anoInicio", e.target.value)}
-            className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            placeholder="Ano"
-          />
-        </div>
-        {form.status !== "andamento" && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Mês Término</label>
-              <select
-                value={form.mesFim}
-                onChange={(e) => handleArrayChange("formacoes", idx, "mesFim", e.target.value)}
-                className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              >
-                <option value="">Selecione</option>
-                {meses.map(mes => (
-                  <option key={mes.valor} value={mes.valor}>{mes.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Ano Término</label>
-              <input
-                type="number"
-                min="1900"
-                max={new Date().getFullYear()}
-                value={form.anoFim}
-                onChange={(e) => handleArrayChange("formacoes", idx, "anoFim", e.target.value)}
-                className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                placeholder="Ano"
-              />
-            </div>
-          </>
-        )}
-      </div>
-      
-      {/* Novo campo de descrição adicionado aqui */}
-      <div className="mt-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Descrição (Opcional)</label>
-        <textarea
-          value={form.descricao}
-          onChange={(e) => handleArrayChange("formacoes", idx, "descricao", e.target.value)}
-          className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-          rows={3}
-          placeholder="Ex: TCC sobre inteligência artificial, disciplinas relevantes, projetos acadêmicos..."
-        />
-        <p className="text-xs text-gray-500 mt-1">Adicione detalhes relevantes sobre sua formação</p>
-      </div>
+const AlertMessage = React.memo(({ message, type = "success", onDismiss }) => {
+  // Animação de entrada/saída pode ser adicionada aqui com Framer Motion ou CSS transitions
+  if (!message) return null;
 
-      {formData.formacoes.length > 1 && (
-        <button
-          type="button"
-          onClick={() => removeField("formacoes", idx)}
-          className="absolute top-2 right-2 sm:top-4 sm:right-4 text-gray-500 hover:text-red-500 transition-colors"
-          title="Remover formação"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
+  const baseClasses = "px-4 py-3 rounded-md text-sm font-medium flex justify-between items-center shadow-md mb-4 border";
+  const typeClasses = {
+    success: "bg-green-50 border-green-300 text-green-800",
+    error: "bg-red-50 border-red-300 text-red-800",
+    info: "bg-blue-50 border-blue-300 text-blue-800",
+    warning: "bg-yellow-50 border-yellow-300 text-yellow-800",
+  };
+
+  return (
+    <div className={`${baseClasses} ${typeClasses[type] || typeClasses.info}`}>
+      <span>{message}</span>
+      {onDismiss && (
+        <button onClick={onDismiss} className="ml-3 text-current opacity-70 hover:opacity-100 text-xl font-bold focus:outline-none focus:ring-1 focus:ring-current rounded-full w-6 h-6 flex items-center justify-center">
+          &times;
         </button>
       )}
     </div>
-  ));
-};
+  );
+});
 
-const renderCertificationFields = () => {
-  return formData.certificacoes.map((cert, idx) => (
-    <div key={idx} className="mb-6 sm:mb-8 p-4 sm:p-6 bg-white rounded-xl shadow-md border border-gray-100 relative">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">{t.campos.certificacao}</label>
-          <input
-            type="text"
-            value={cert.titulo || ""}
-            onChange={(e) => handleArrayChange("certificacoes", idx, "titulo", e.target.value)}
-            className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            placeholder={t.placeholders.certificacao}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">Emissor/Instituição</label>
-          <input
-            type="text"
-            value={cert.emissor || ""}
-            onChange={(e) => handleArrayChange("certificacoes", idx, "emissor", e.target.value)}
-            className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            placeholder="Ex: Udemy, Alura, AWS"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">Data de Conclusão</label>
-          <input
-            type="text"
-            value={cert.data || ""}
-            onChange={(e) => handleArrayChange("certificacoes", idx, "data", e.target.value)}
-            className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            placeholder="Ex: Jun 2023"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">Carga Horária</label>
-          <input
-            type="text"
-            value={cert.cargaHoraria || ""}
-            onChange={(e) => handleArrayChange("certificacoes", idx, "cargaHoraria", e.target.value)}
-            className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            placeholder="Ex: 40 horas"
-          />
-        </div>
-      </div>
-
-      {/* Novo campo para link de validação */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">Link de Validação</label>
-        <input
-          type="url"
-          value={cert.linkValidacao || ""}
-          onChange={(e) => handleArrayChange("certificacoes", idx, "linkValidacao", e.target.value)}
-          className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-          placeholder="Ex: https://certificado.instituicao.com/123456"
-        />
-        <p className="text-xs text-gray-500 mt-1">Link para verificar a autenticidade da certificação</p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">Descrição</label>
-        <textarea
-          value={cert.descricao || ""}
-          onChange={(e) => handleArrayChange("certificacoes", idx, "descricao", e.target.value)}
-          className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-          rows={3}
-          placeholder="Ex: Curso focado em desenvolvimento de APIs REST com Node.js..."
-        />
-      </div>
-
-      <button
-        type="button"
-        onClick={() => removeField("certificacoes", idx)}
-        className="absolute top-2 right-2 sm:top-4 sm:right-4 text-gray-500 hover:text-red-500 transition-colors"
-        title="Remover certificação"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-        </svg>
-      </button>
-    </div>
-  ));
-};
-
-  const renderLinkFields = () => {
-  return formData.links.map((link, idx) => {
-    const redeSocial = tiposRedesSociais.find(t => t.valor === link.tipo);
-    
-    return (
-      <div key={idx} className="mb-4 p-4 bg-white rounded-xl shadow-sm border border-gray-100 relative">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Link</label>
-            <select
-              value={link.tipo}
-              onChange={(e) => handleArrayChange("links", idx, "tipo", e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {tiposRedesSociais.map(tipo => (
-                <option key={tipo.valor} value={tipo.valor}>{tipo.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
-            <div className="flex">
-              {redeSocial.prefixo && (
-                <span className="inline-flex items-center px-2 rounded-l-lg border border-r-0 border-gray-300 bg-gray-100 text-gray-500 text-sm">
-                  {redeSocial.prefixo}
-                </span>
-              )}
-              <input
-                type="text"
-                value={link.url}
-                onChange={(e) => handleArrayChange("links", idx, "url", e.target.value)}
-                className={`flex-1 min-w-0 p-2 ${redeSocial.prefixo ? 'rounded-none rounded-r-lg' : 'rounded-lg'} border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-                placeholder={`Ex: ${t.placeholders[link.tipo] || 'seu-usuario'}`}
-              />
-            </div>
-          </div>
-        </div>
-        
-        <button
-          type="button"
-          onClick={() => removeField("links", idx)}
-          className="absolute top-2 right-2 text-gray-400 hover:text-red-500"
-          title="Remover link"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
-        </button>
-      </div>
-    );
+// --- Hook para localStorage (Mais Robusto) ---
+function usePersistentState(key, initialValue) {
+  const [state, setState] = useState(() => {
+    try {
+      const savedData = localStorage.getItem(key);
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        // Melhorar a lógica de merge para lidar com estruturas aninhadas se necessário
+        if (typeof parsedData === 'object' && parsedData !== null && typeof initialValue === 'object' && initialValue !== null) {
+            const merged = { ...initialValue };
+             Object.keys(initialValue).forEach(k => {
+                 if (parsedData.hasOwnProperty(k)) {
+                     // Evitar sobrescrever array com não-array do localStorage
+                     if (Array.isArray(initialValue[k]) && !Array.isArray(parsedData[k])) {
+                         merged[k] = initialValue[k];
+                     } else {
+                         merged[k] = parsedData[k];
+                     }
+                 }
+             });
+             return merged;
+        } else if (typeof parsedData === typeof initialValue) {
+             return parsedData;
+        }
+      }
+    } catch (error) {
+      console.error(`Erro ao carregar estado do localStorage (chave: ${key}):`, error);
+    }
+    return typeof initialValue === 'function' ? initialValue() : initialValue;
   });
-};
 
-  const renderLanguageFields = () => {
-    return formData.idiomas.map((idioma, idx) => (
-      <div key={idx} className="mb-8 p-4 sm:p-6 bg-white rounded-xl shadow-md border border-gray-100 relative">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t.campos.idioma}</label>
-            <input
-              type="text"
-              value={idioma.idioma}
-              onChange={(e) => handleArrayChange("idiomas", idx, "idioma", e.target.value)}
-              className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              placeholder={t.placeholders.idioma}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t.campos.nivel}</label>
-            <select
-              value={idioma.nivel}
-              onChange={(e) => handleArrayChange("idiomas", idx, "nivel", e.target.value)}
-              className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            >
-              <option value="">{t.campos.nivel}</option>
-              {t.niveisIdioma.map((nivel, i) => (
-                <option key={i} value={nivel}>{nivel}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+  useEffect(() => {
+    try {
+      // Evitar salvar o estado inicial vazio no primeiro render, a menos que já exista algo
+      const isInitial = JSON.stringify(state) === JSON.stringify(typeof initialValue === 'function' ? initialValue() : initialValue);
+      if (!isInitial || localStorage.getItem(key) !== null) {
+           localStorage.setItem(key, JSON.stringify(state));
+      }
+    } catch (error) {
+      console.error(`Erro ao salvar estado no localStorage (chave: ${key}):`, error);
+    }
+    // Dependência 'initialValue' pode causar re-salvamentos desnecessários se for função que muda
+    // Se initialValue for sempre estável (como useMemo garante), está ok.
+  }, [key, state, initialValue]);
 
-        {formData.idiomas.length > 1 && (
-          <button
-            type="button"
-            onClick={() => removeField("idiomas", idx)}
-            className="absolute top-2 right-2 sm:top-4 sm:right-4 text-gray-500 hover:text-red-500 transition-colors"
-            title="Remover idioma"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-          </button>
-        )}
-      </div>
-    ));
-  };
-  
+  return [state, setState];
+}
 
-  return (
-    
-    <div className="min-h-screen bg-gray-50">
+// --- Componente Principal --- 
+function App() {
+  // --- Estados --- 
+  const initialFormData = useMemo(() => ({
+    nome: "", telefone: "", ddd: "", codigoPais: "+55", cidade: "", email: "",
+    links: [], cargoDesejado: "", resumo: "", experiencias: [], formacoes: [],
+    habilidades: [], certificacoes: [], idiomas: [],
+  }), []);
 
+  const LOCAL_STORAGE_KEY = 'resumeFormData_v3_professional'; // Chave atualizada
+  const [formData, setFormData] = usePersistentState(LOCAL_STORAGE_KEY, initialFormData);
+  const [tempFields, setTempFields] = useState({ newLinkTipo: "linkedin", newLinkUrl: "" });
+  const [errors, setErrors] = useState({});
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [habilidadesInput, setHabilidadesInput] = useState("");
+  const [idiomaApp, setIdiomaApp] = useState("pt");
+  const [showLoadedMessage, setShowLoadedMessage] = useState(false);
+  const [isLangOpen, setIsLangOpen] = useState(false);
+  const formRef = useRef(null);
 
+   useEffect(() => {
+    // Sincronizar input de habilidades com o estado
+    if (formData.habilidades) {
+      setHabilidadesInput(formData.habilidades.join(', '));
+    }
+  }, [formData.habilidades]);
 
+  useEffect(() => {
+    // Mostrar mensagem de dados carregados apenas uma vez
+    const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedData && JSON.stringify(formData) !== JSON.stringify(initialFormData)) {
+      setShowLoadedMessage(true);
+      const timer = setTimeout(() => setShowLoadedMessage(false), 4000);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Executar apenas na montagem
 
+  // --- Objeto de traduções (COMPLETO - Mantido da v3) --- 
+  const textos = useMemo(() => ({
+    pt: {
+      tituloApp: "Gerador de Currículo ATS",
+      subtituloApp: "Crie um currículo profissional otimizado para ATS",
+      dicasATS: "Dicas Rápidas para ATS",
+      dicasLista: [
+        "Use palavras-chave da vaga.",
+        "Fontes padrão (Helvetica, Arial) são seguras para ATS.",
+        "Títulos de seção padrão (Experiência, Formação...).",
+        "Evite tabelas, colunas, imagens, cabeçalhos/rodapés.",
+        "Formato PDF baseado em texto.",
+        "Revise antes de enviar!"
+      ],
+      campos: {
+        nome: "Nome Completo", cargoDesejado: "Cargo Desejado", codigoPais: "Cód. País", ddd: "DDD",
+        telefone: "Telefone", cidade: "Cidade, Estado", linkedin: "LinkedIn", github: "GitHub", gitlab: "GitLab", behance: "Behance", portfolio: "Portfolio", outro: "Outro",
+        email: "Email", resumo: "Resumo Profissional", experiencia: "Experiência Profissional",
+        formacao: "Formação Acadêmica", habilidades: "Habilidades (separadas por vírgula)", idiomas: "Idiomas",
+        certificacoes: "Certificações e Cursos", dataCertificacao: "Data (MM/AAAA)", cargaHoraria: "Carga Horária (opcional)",
+        descricaoCertificacao: "Descrição (opcional)", tipoFormacao: "Tipo", curso: "Curso/Área", instituicao: "Instituição",
+        periodo: "Período", cargo: "Cargo", empresa: "Empresa", tecnologias: "Tecnologias (opcional)",
+        atividades: "Responsabilidades/Atividades", resultados: "Resultados/Conquistas (opcional)", idioma: "Idioma",
+        nivel: "Nível", certificacao: "Certificação/Curso", linkValidacao: "Link Validação (opcional)",
+        instituicaoEmissora: "Instituição Emissora", status: "Status", mesInicio: "Mês Início", anoInicio: "Ano Início",
+        mesFim: "Mês Fim", anoFim: "Ano Fim", atual: "Atual", tipoLink: "Tipo", urlLink: "URL"
+      },
+      placeholders: {
+        nome: "Seu Nome Completo", cargoDesejado: "Ex: Engenheiro de Software Sênior", ddd: "Ex: 11",
+        telefone: "Ex: 98765-4321", cidade: "Ex: São Paulo, SP", linkedin: "linkedin.com/in/seu-perfil",
+        portfolio: "github.com/seu-usuario ou seusite.com", email: "seu.email@provedor.com",
+        resumo: "Descreva seus objetivos e qualificações chave de forma concisa e impactante.", curso: "Ex: Ciência da Computação",
+        instituicao: "Ex: Universidade de São Paulo", periodo: "Ex: 08/2018 - 07/2022",
+        cargo: "Ex: Desenvolvedor Full-Stack Pleno", empresa: "Ex: Empresa Exemplo Ltda.",
+        tecnologias: "Ex: Java, Spring Boot, React, PostgreSQL, AWS",
+        atividades: "- Descreva suas principais tarefas usando marcadores simples (-). Use verbos de ação.",
+        resultados: "- Destaque conquistas quantificáveis usando marcadores simples (-). Ex: Reduzi o tempo de carregamento em 20%.",
+        habilidades: "Python, Liderança de Projetos, Comunicação Eficaz, Power BI", idioma: "Ex: Inglês",
+        certificacao: "Ex: AWS Certified Solutions Architect", linkValidacao: "URL de validação (opcional)",
+        instituicaoEmissora: "Ex: Coursera, AWS, Google", dataCertificacao: "MM/AAAA", cargaHoraria: "Ex: 40h",
+        descricaoCertificacao: "Descreva brevemente o que foi aprendido ou o projeto desenvolvido", mes: "Mês", ano: "Ano",
+        urlLink: "URL completa (ex: https://...)", tipoLink: "Tipo", nivelIdioma: "Nível"
+      },
+      botoes: {
+        adicionarExperiencia: "Adicionar Experiência", adicionarFormacao: "Adicionar Formação",
+        adicionarIdioma: "Adicionar Idioma", adicionarCertificacao: "Adicionar Certificação/Curso",
+        adicionarLink: "Adicionar Link", remover: "Remover",
+        gerarCV: "Gerar Currículo ATS"
+      },
+      mensagens: {
+        nenhumaExperiencia: "Nenhuma experiência profissional adicionada.", nenhumaFormacao: "Nenhuma formação acadêmica adicionada.",
+        nenhumIdioma: "Nenhum idioma adicionado.", nenhumaCertificacao: "Nenhuma certificação ou curso adicionado.",
+        sucesso: "Currículo ATS gerado com sucesso!", gerando: "Gerando Currículo...",
+        carregado: "Dados anteriores carregados do seu navegador.", avisoCampos: "Aviso: Preencher Nome, Email e Resumo é altamente recomendado para um bom currículo.",
+        erroGeracao: "Erro ao gerar PDF. Verifique os dados e tente novamente.",
+        erroFormatoEmail: "Formato de email inválido",
+        erroValidacao: "Por favor, corrija os erros indicados antes de gerar o PDF.",
+        erroNaN: "Erro interno ao calcular posição no PDF. Tente novamente ou simplifique o texto.",
+        erroLocalStorageCarregar: "Não foi possível carregar os dados salvos anteriormente.",
+        erroLocalStorageSalvar: "Não foi possível salvar as alterações recentes."
+      },
+      secoesPDF: {
+        resumo: "Resumo Profissional", experiencia: "Experiência Profissional", formacao: "Formação Acadêmica",
+        habilidades: "Habilidades", idiomas: "Idiomas", certificacoes: "Certificações e Cursos",
+        contato: "Contato", links: "Links", tecnologias: "Tecnologias", validacao: "Validação"
+      },
+      niveisIdioma: ["Básico", "Intermediário", "Avançado", "Fluente", "Nativo"],
+      labelAtual: "Atual", labelPresent: "Present", labelActual: "Actual",
+      selecione: "Selecione...",
+      linkGithub: "Projeto no GitHub" // Nova tradução
+    },
+    en: {
+      tituloApp: "ATS Resume Builder",
+      subtituloApp: "Create a professional, ATS-optimized resume",
+      dicasATS: "Quick ATS Tips",
+      dicasLista: [
+        "Use keywords from the job description.",
+        "Standard fonts (Helvetica, Arial) are ATS-safe.",
+        "Use standard section titles (Experience, Education...).",
+        "Avoid tables, columns, images, headers/footers.",
+        "Use a text-based PDF format.",
+        "Proofread before submitting!"
+      ],
+      campos: {
+        nome: "Full Name", cargoDesejado: "Desired Position", codigoPais: "Country Code", ddd: "Area Code",
+        telefone: "Phone", cidade: "City, State/Country", linkedin: "LinkedIn", github: "GitHub", gitlab: "GitLab", behance: "Behance", portfolio: "Portfolio", outro: "Other",
+        email: "Email", resumo: "Professional Summary", experiencia: "Work Experience",
+        formacao: "Education", habilidades: "Skills (comma-separated)", idiomas: "Languages",
+        certificacoes: "Certifications & Courses", dataCertificacao: "Date (MM/YYYY)", cargaHoraria: "Hours (optional)",
+        descricaoCertificacao: "Description (optional)", tipoFormacao: "Type", curso: "Course/Field", instituicao: "Institution",
+        periodo: "Period", cargo: "Position", empresa: "Company", tecnologias: "Technologies (optional)",
+        atividades: "Responsibilities/Activities", resultados: "Results/Achievements (optional)", idioma: "Language",
+        nivel: "Level", certificacao: "Certification/Course", linkValidacao: "Validation Link (optional)",
+        instituicaoEmissora: "Issuing Institution", status: "Status", mesInicio: "Start Month", anoInicio: "Start Year",
+        mesFim: "End Month", anoFim: "End Year", atual: "Current", tipoLink: "Type", urlLink: "URL"
+      },
+      placeholders: {
+        nome: "Your Full Name", cargoDesejado: "Ex: Senior Software Engineer", ddd: "Ex: 212",
+        telefone: "Ex: 555-1234", cidade: "Ex: New York, NY", linkedin: "linkedin.com/in/your-profile",
+        portfolio: "github.com/your-username or yoursite.com", email: "your.email@provider.com",
+        resumo: "Describe your objectives and key qualifications concisely and impactfully.", curso: "Ex: Computer Science",
+        instituicao: "Ex: University of California", periodo: "Ex: 08/2018 - 07/2022",
+        cargo: "Ex: Full-Stack Developer", empresa: "Ex: Example Company Inc.",
+        tecnologias: "Ex: Java, Spring Boot, React, PostgreSQL, AWS",
+        atividades: "- Describe your main tasks using simple bullet points (-). Use action verbs.",
+        resultados: "- Highlight quantifiable achievements using simple bullet points (-). Ex: Reduced loading time by 20%.",
+        habilidades: "Python, Project Leadership, Effective Communication, Power BI", idioma: "Ex: English",
+        certificacao: "Ex: AWS Certified Solutions Architect", linkValidacao: "Validation URL (optional)",
+        instituicaoEmissora: "Ex: Coursera, AWS, Google", dataCertificacao: "MM/YYYY", cargaHoraria: "Ex: 40h",
+        descricaoCertificacao: "Briefly describe what was learned or the project developed", mes: "Month", ano: "Year",
+        urlLink: "Full URL (e.g., https://...)", tipoLink: "Type", nivelIdioma: "Level"
+      },
+      botoes: {
+        adicionarExperiencia: "Add Experience", adicionarFormacao: "Add Education",
+        adicionarIdioma: "Add Language", adicionarCertificacao: "Add Certification/Course",
+        adicionarLink: "Add Link", remover: "Remove",
+        gerarCV: "Generate ATS Resume"
+      },
+      mensagens: {
+        nenhumaExperiencia: "No work experience added.", nenhumaFormacao: "No education added.",
+        nenhumIdioma: "No languages added.", nenhumaCertificacao: "No certifications or courses added.",
+        sucesso: "ATS Resume generated successfully!", gerando: "Generating Resume...",
+        carregado: "Previous data loaded from your browser.", avisoCampos: "Warning: Filling in Name, Email, and Summary is highly recommended for a good resume.",
+        erroGeracao: "Error generating PDF. Check your data and try again.",
+        erroFormatoEmail: "Invalid email format",
+        erroValidacao: "Please correct the indicated errors before generating the PDF.",
+        erroNaN: "Internal error calculating PDF position. Please try again or simplify text.",
+        erroLocalStorageCarregar: "Could not load previously saved data.",
+        erroLocalStorageSalvar: "Could not save recent changes."
+      },
+      secoesPDF: {
+        resumo: "Professional Summary", experiencia: "Work Experience", formacao: "Education",
+        habilidades: "Skills", idiomas: "Languages", certificacoes: "Certifications & Courses",
+        contato: "Contact", links: "Links", tecnologias: "Technologies", validacao: "Validation"
+      },
+      niveisIdioma: ["Basic", "Intermediate", "Advanced", "Fluent", "Native"],
+      labelAtual: "Current", labelPresent: "Present", labelActual: "Actual",
+      selecione: "Select...",
+      linkGithub: "Project on GitHub" // Nova tradução
+    },
+    es: {
+      tituloApp: "Generador de CV ATS",
+      subtituloApp: "Crea un currículum profesional optimizado para ATS",
+      dicasATS: "Consejos Rápidos para ATS",
+      dicasLista: [
+        "Usa palabras clave de la oferta de empleo.",
+        "Fuentes estándar (Helvetica, Arial) son seguras para ATS.",
+        "Títulos de sección estándar (Experiencia, Formación...).",
+        "Evita tablas, columnas, imágenes, encabezados/pies de página.",
+        "Formato PDF basado en texto.",
+        "¡Revisa antes de enviar!"
+      ],
+      campos: {
+        nome: "Nombre Completo", cargoDesejado: "Puesto Deseado", codigoPais: "Cód. País", ddd: "Prefijo",
+        telefone: "Teléfono", cidade: "Ciudad, Provincia/País", linkedin: "LinkedIn", github: "GitHub", gitlab: "GitLab", behance: "Behance", portfolio: "Portfolio", outro: "Otro",
+        email: "Email", resumo: "Resumen Profesional", experiencia: "Experiencia Profesional",
+        formacao: "Formación Académica", habilidades: "Habilidades (separadas por coma)", idiomas: "Idiomas",
+        certificacoes: "Certificaciones y Cursos", dataCertificacao: "Fecha (MM/AAAA)", cargaHoraria: "Horas (opcional)",
+        descricaoCertificacao: "Descripción (opcional)", tipoFormacao: "Tipo", curso: "Curso/Área", instituicao: "Institución",
+        periodo: "Período", cargo: "Puesto", empresa: "Empresa", tecnologias: "Tecnologías (opcional)",
+        atividades: "Responsabilidades/Actividades", resultados: "Resultados/Logros (opcional)", idioma: "Idioma",
+        nivel: "Nivel", certificacao: "Certificación/Curso", linkValidacao: "Enlace Validación (opcional)",
+        instituicaoEmissora: "Institución Emisora", status: "Estado", mesInicio: "Mes Inicio", anoInicio: "Año Inicio",
+        mesFim: "Mes Fin", anoFim: "Año Fin", atual: "Actual", tipoLink: "Tipo", urlLink: "URL"
+      },
+      placeholders: {
+        nome: "Tu Nombre Completo", cargoDesejado: "Ej: Ingeniero de Software Senior", ddd: "Ej: 11",
+        telefone: "Ej: 15-1234-5678", cidade: "Ej: Buenos Aires, AR", linkedin: "linkedin.com/in/tu-perfil",
+        portfolio: "github.com/tu-usuario o tusitio.com", email: "tu.email@proveedor.com",
+        resumo: "Describe tus objetivos y cualificaciones clave de forma concisa e impactante.", curso: "Ej: Ciencias de la Computación",
+        instituicao: "Ej: Universidad de Buenos Aires", periodo: "Ej: 08/2018 - 07/2022",
+        cargo: "Ej: Desarrollador Full-Stack", empresa: "Ej: Empresa Ejemplo S.A.",
+        tecnologias: "Ej: Java, Spring Boot, React, PostgreSQL, AWS",
+        atividades: "- Describe tus tareas principales usando viñetas simples (-). Usa verbos de acción.",
+        resultados: "- Destaca logros cuantificables usando viñetas simples (-). Ej: Reduje el tiempo de carga en un 20%.",
+        habilidades: "Python, Liderazgo de Proyectos, Comunicación Efectiva, Power BI", idioma: "Ej: Inglés",
+        certificacao: "Ej: AWS Certified Solutions Architect", linkValidacao: "URL de validación (opcional)",
+        instituicaoEmissora: "Ej: Coursera, AWS, Google", dataCertificacao: "MM/AAAA", cargaHoraria: "Ej: 40h",
+        descricaoCertificacao: "Describe brevemente lo aprendido o el proyecto desarrollado", mes: "Mes", ano: "Año",
+        urlLink: "URL completa (ej: https://...)", tipoLink: "Tipo", nivelIdioma: "Nivel"
+      },
+      botoes: {
+        adicionarExperiencia: "Añadir Experiencia", adicionarFormacao: "Añadir Formación",
+        adicionarIdioma: "Añadir Idioma", adicionarCertificacao: "Añadir Certificación/Curso",
+        adicionarLink: "Añadir Enlace", remover: "Eliminar",
+        gerarCV: "Generar CV ATS"
+      },
+      mensagens: {
+        nenhumaExperiencia: "No se ha añadido experiencia profesional.", nenhumaFormacao: "No se ha añadido formación académica.",
+        nenhumIdioma: "No se han añadido idiomas.", nenhumaCertificacao: "No se han añadido certificaciones o cursos.",
+        sucesso: "¡CV ATS generado con éxito!", gerando: "Generando CV...",
+        carregado: "Datos anteriores cargados desde tu navegador.", avisoCampos: "Aviso: Completar Nombre, Email y Resumen es muy recomendable para un buen CV.",
+        erroGeracao: "Error al generar PDF. Verifica los datos e inténtalo de nuevo.",
+        erroFormatoEmail: "Formato de email inválido",
+        erroValidacao: "Por favor, corrige los errores indicados antes de generar el PDF.",
+        erroNaN: "Error interno al calcular posición en PDF. Inténtalo de nuevo o simplifica el texto.",
+        erroLocalStorageCarregar: "No se pudieron cargar los datos guardados anteriormente.",
+        erroLocalStorageSalvar: "No se pudieron guardar los cambios recientes."
+      },
+      secoesPDF: {
+        resumo: "Resumen Profesional", experiencia: "Experiencia Profesional", formacao: "Formación Académica",
+        habilidades: "Habilidades", idiomas: "Idiomas", certificacoes: "Certificaciones y Cursos",
+        contato: "Contacto", links: "Enlaces", tecnologias: "Tecnologías", validacao: "Validación"
+      },
+      niveisIdioma: ["Básico", "Intermedio", "Avanzado", "Fluido", "Nativo"],
+      labelAtual: "Actual", labelPresent: "Present", labelActual: "Actual",
+      selecione: "Selecciona...",
+      linkGithub: "Proyecto en GitHub" // Nova tradução
+    },
+  }), []);
 
-{mostrarErro && (
-  <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded relative m-4">
-    <strong className="font-bold">Atenção:</strong>
-    <span className="block sm:inline ml-2">
-      Estamos melhorando a geração de conteúdo com emojis e alguns caracteres especiais. Por enquanto, evite usá-los para garantir o funcionamento.
-    </span>
+  // --- Handlers (Mantidos da v3, com pequenas otimizações) ---
+  const t = useMemo(() => textos[idiomaApp] || textos.pt, [textos, idiomaApp]);
 
-    <button
-      onClick={() => setMostrarErro(false)}
-      className="ml-4 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded"
-    >
-      Entendi
-    </button>
-  </div>
-)}
+  const handleChange = useCallback((e) => {
+    const { name, value } = e.target;
+    if (name in tempFields) {
+        setTempFields(prev => ({ ...prev, [name]: value }));
+    } else {
+        setFormData(prev => ({ ...prev, [name]: value }));
+    }
+    // Limpar erro específico ao digitar no campo
+    if (errors[name]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+    // Limpar mensagem de erro geral ao interagir com o form
+    if (errorMessage) setErrorMessage("");
+  }, [errors, errorMessage, tempFields, setFormData]);
 
+  const handleHabilidadesChange = useCallback((e) => {
+    const inputText = e.target.value;
+    setHabilidadesInput(inputText); // Only update local input state
+  }, []); // Removed setFormData dependency
 
-    
+  const handleHabilidadesBlur = useCallback(() => {
+    const habilidadesArray = habilidadesInput
+      .split(',')
+      .map(item => item.trim())
+      .filter(item => item.length > 0);
+    setFormData(prev => ({ ...prev, habilidades: habilidadesArray }));
+  }, [habilidadesInput, setFormData]);
 
-      {/* Header moderno */}
-      <header className="bg-gradient-to-r from-blue-600 to-blue-800 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold">{t.tituloApp}</h1>
-              <p className="text-blue-100 mt-1 sm:mt-2 text-sm sm:text-base">{t.subtituloApp}</p>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
-              <select
-                value={idiomaApp}
-                onChange={(e) => setIdiomaApp(e.target.value)}
-                className="bg-white/20 backdrop-blur-sm text-white border border-white/30 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white transition-all"
-              >
-                {idiomasApp.map((idioma) => (
-                  <option key={idioma.codigo} value={idioma.codigo} className="text-gray-800">
-                    {idioma.icone} {idioma.nome}
-                  </option>
-                ))}
-              </select>
-              
-              <button
-                onClick={() => gerarPDF()}
-                disabled={isGenerating}
-                className={`px-4 sm:px-6 py-2 rounded-full text-white font-medium flex items-center justify-center transition-all ${
-                  isGenerating ? "bg-gray-500 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600 shadow-md hover:shadow-lg"
-                }`}
-              >
-                {isGenerating ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 sm:h-5 sm:w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span className="text-sm sm:text-base">{t.mensagens.gerando}</span>
-                  </>
-                ) : (
-                  <>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span className="text-sm sm:text-base">{t.botoes.gerarCV}</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-          
-          
-        </div>
-      </header>
+  const handleRemoveHabilidade = useCallback((skillToRemove) => {
+    setFormData(prev => {
+      const updatedHabilidades = prev.habilidades.filter(h => h !== skillToRemove);
+      return { ...prev, habilidades: updatedHabilidades };
+    });
+  }, [setFormData]);
 
+  const addField = useCallback((fieldType) => {
+    setFormData(prev => {
+      const newId = `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const fieldArray = prev[fieldType] || [];
+      let newItem = { id: newId };
 
-                  {showGenerationAnimation && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div className="bg-white p-8 rounded-xl max-w-md text-center animate-pop-in">
-      <div className="w-20 h-20 mx-auto mb-6 flex items-center justify-center bg-green-100 rounded-full">
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          className="h-12 w-12 text-green-500 animate-checkmark"
-          fill="none" 
-          viewBox="0 0 24 24" 
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      </div>
-      <h3 className="text-2xl font-bold text-gray-800 mb-2">Currículo Gerado!</h3>
-      <p className="text-gray-600 mb-6">Seu currículo ATS-friendly está pronto para download.</p>
-      <div className="w-full bg-gray-200 rounded-full h-2.5">
-        <div 
-          className="bg-blue-600 h-2.5 rounded-full animate-progress" 
-          style={{ animationDuration: '2s' }}
-        ></div>
-      </div>
-    </div>
-  </div>
-)}
+      if (fieldType === "experiencias") {
+        newItem = { ...newItem, cargo: "", empresa: "", mesInicio: "", anoInicio: "", mesFim: "", anoFim: "", atual: false, tecnologias: "", atividades: "", resultados: "" };
+      } else if (fieldType === "formacoes") {
+        newItem = { ...newItem, tipo: "superior", curso: "", instituicao: "", status: "completo", mesInicio: "", anoInicio: "", mesFim: "", anoFim: "", descricao: "" };
+      } else if (fieldType === "idiomas") {
+        newItem = { ...newItem, idioma: "", nivel: t.niveisIdioma[0] };
+      } else if (fieldType === "certificacoes") {
+        newItem = { ...newItem, certificacao: "", instituicaoEmissora: "", dataCertificacao: "", cargaHoraria: "", descricao: "", linkValidacao: "" };
+      } else if (fieldType === "links") {
+        if (!tempFields.newLinkUrl || !tempFields.newLinkUrl.trim()) return prev; // Não adiciona link vazio
+        newItem = { ...newItem, tipo: tempFields.newLinkTipo || "linkedin", url: tempFields.newLinkUrl.trim() };
+        setTempFields({ newLinkTipo: "linkedin", newLinkUrl: "" }); // Limpa campos temporários
+        return {
+          ...prev,
+          [fieldType]: [...fieldArray, newItem],
+        };
+      }
 
+      // Apenas adiciona se não for 'links' (já tratado acima)
+      if (fieldType !== "links") {
+         return { ...prev, [fieldType]: [...fieldArray, newItem] };
+      }
+      return prev;
+    });
+  }, [t, tempFields, setFormData]);
 
-      {/* Navegação por seções */}
-      <div className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 overflow-x-auto">
-          <div className="flex">
-            {[
-              { id: "info", label: t.campos.nome.split("*")[0] },
-              { id: "resumo", label: t.campos.resumo.split("*")[0] },
-              { id: "experiencia", label: t.campos.experiencia },
-              { id: "formacao", label: t.campos.formacao },
-              { id: "habilidades", label: t.campos.habilidades },
-              { id: "idiomas", label: t.campos.idiomas },
-              { id: "certificacoes", label: t.campos.certificacoes }
-            ].map((section) => (
-              <button
-                key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                className={`px-3 py-3 font-medium text-xs sm:text-sm whitespace-nowrap border-b-2 transition-colors ${
-                  activeSection === section.id ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {section.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+  const handleRemoveItem = useCallback((fieldType, itemId) => {
+    setFormData(prev => ({
+      ...prev,
+      [fieldType]: (prev[fieldType] || []).filter(item => item.id !== itemId)
+    }));
+  }, [setFormData]);
 
-      {/* Conteúdo principal */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {successMessage && (
-          <div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-4 rounded-lg flex items-center mb-6">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-            <p>{successMessage}</p>
-          </div>
-        )}
-        
-        <form onSubmit={(e) => { e.preventDefault(); gerarPDF(); }} className="space-y-6 sm:space-y-8">
-          {/* Seção de Informações Pessoais */}
-<div id="info" className={`space-y-4 sm:space-y-6 ${activeSection !== "info" && "hidden"}`}>
-  <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center">
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-    </svg>
-    Informações Pessoais
-  </h2>
-  
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">{t.campos.nome}</label>
-      <input
-        type="text"
-        name="nome"
-        value={formData.nome}
-        onChange={handleChange}
-        className={`w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-          errors.nome ? "border-red-500" : ""
-        }`}
-        placeholder={t.placeholders.nome}
-      />
-      {errors.nome && <p className="text-red-500 text-xs mt-1 sm:mt-2">{errors.nome}</p>}
-    </div>
-    
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">{t.campos.cargoDesejado}</label>
-      <input
-        type="text"
-        name="cargoDesejado"
-        value={formData.cargoDesejado}
-        onChange={handleChange}
-        className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-        placeholder={t.placeholders.cargoDesejado}
-      />
-    </div>
-  </div>
-  
-  {/* Telefone com DDD e código do país */}
-  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">{t.campos.codigoPais}</label>
-      <select
-        name="codigoPais"
-        value={formData.codigoPais}
-        onChange={handleChange}
-        className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-      >
-        {paisesTelefone.map(pais => (
-          <option key={pais.codigo} value={pais.codigo}>{pais.nome}</option>
-        ))}
-      </select>
-    </div>
-    
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">{t.campos.ddd}</label>
-      <input
-        type="text"
-        name="ddd"
-        value={formData.ddd}
-        onChange={handleChange}
-        className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-        placeholder={t.placeholders.ddd}
-        maxLength="2"
-      />
-    </div>
-    
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">{t.campos.telefone}</label>
-      <input
-        type="tel"
-        name="telefone"
-        value={formData.telefone}
-        onChange={handleChange}
-        className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-        placeholder={t.placeholders.telefone}
-      />
-    </div>
-  </div>
-  
-  {/* Email e Cidade */}
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">{t.campos.email}</label>
-      <input
-        type="email"
-        name="email"
-        value={formData.email}
-        onChange={handleChange}
-        className={`w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-          errors.email ? "border-red-500" : ""
-        }`}
-        placeholder={t.placeholders.email}
-      />
-      {errors.email && <p className="text-red-500 text-xs mt-1 sm:mt-2">{errors.email}</p>}
-    </div>
-    
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">{t.campos.cidade}</label>
-      <input
-        type="text"
-        name="cidade"
-        value={formData.cidade}
-        onChange={handleChange}
-        className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-        placeholder={t.placeholders.cidade}
-      />
-    </div>
-  </div>
-  
-  {/* Links de redes sociais */}
-  <div className="mt-4">
-    <div className="flex justify-between items-center mb-3">
-      <h3 className="text-sm font-medium text-gray-700">Links e Redes Sociais</h3>
-      <button
-        type="button"
-        onClick={() => addField("links", { tipo: "linkedin", url: "" })}
-        className="flex items-center text-blue-600 hover:text-blue-800 text-sm"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-        </svg>
-        Adicionar Link
-      </button>
-    </div>
-    
-    {formData.links.length > 0 ? (
-      renderLinkFields()
-    ) : (
-      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-        </svg>
-        <p className="mt-2 text-sm text-gray-500">Nenhum link adicionado</p>
-      </div>
-    )}
-  </div>
-</div>
-          
-          {/* Resumo Profissional */}
-          <div id="resumo" className={`space-y-4 sm:space-y-6 ${activeSection !== "resumo" && "hidden"}`}>
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              {t.campos.resumo}
-            </h2>
-            <textarea
-              name="resumo"
-              value={formData.resumo}
-              onChange={handleChange}
-              className={`w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${
-                errors.resumo ? "border-red-500" : ""
-              }`}
-              rows={5}
-              placeholder={t.placeholders.resumo}
-            />
-            {errors.resumo && <p className="text-red-500 text-xs mt-1 sm:mt-2">{errors.resumo}</p>}
-            <p className="text-xs text-gray-500">{t.placeholders.resumo.split(":")[0]}</p>
-          </div>
-          
-          {/* Experiência Profissional */}
-          <div id="experiencia" className={`space-y-4 sm:space-y-6 ${activeSection !== "experiencia" && "hidden"}`}>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                {t.campos.experiencia}
-              </h2>
-              <button
-                type="button"
-                onClick={() => addField("experiencias", { cargo: "", empresa: "", periodo: "", tecnologias: "", atividades: "", resultados: "" })}
-                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg transition-colors w-full sm:w-auto justify-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-                </svg>
-                {t.botoes.adicionarExperiencia}
-              </button>
-            </div>
-            
-            {formData.experiencias.length > 0 ? (
-              renderExperienceFields()
-            ) : (
-              <div className="bg-gray-50 p-4 sm:p-6 rounded-lg border border-gray-200 text-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                </svg>
-                <p className="mt-2 text-sm text-gray-500">{t.mensagens.nenhumaExperiencia}</p>
-              </div>
-            )}
-          </div>
-          
-          {/* Formação Acadêmica */}
-          <div id="formacao" className={`space-y-4 sm:space-y-6 ${activeSection !== "formacao" && "hidden"}`}>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path d="M12 14l9-5-9-5-9 5 9 5z" />
-                  <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
-                </svg>
-                {t.campos.formacao}
-              </h2>
-              <button
-                type="button"
-                onClick={() => addField("formacoes", { 
-  tipo: "superior", 
-  curso: "", 
-  instituicao: "", 
-  mesInicio: "",
-  anoInicio: "",
-  mesFim: "",
-  anoFim: "",
-  emAndamento: false,
-  descricao: "" // Novo campo
-})}
-                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg transition-colors w-full sm:w-auto justify-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-                </svg>
-                {t.botoes.adicionarFormacao}
-              </button>
-            </div>
-            
-            {renderEducationFields()}
-          </div>
-          
-          {/* Habilidades Técnicas */}
-          <div id="habilidades" className={`space-y-4 sm:space-y-6 ${activeSection !== "habilidades" && "hidden"}`}>
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-              </svg>
-              {t.campos.habilidades}
-            </h2>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">{t.placeholders.habilidades.split(":")[0]}</label>
-              <input
-                type="text"
-                value={habilidadesInput}
-                onChange={handleHabilidadesChange}
-                className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                placeholder={t.placeholders.habilidades}
-              />
-              <p className="text-xs text-gray-500 mt-1 sm:mt-2">{t.placeholders.habilidades.split(":")[0]}</p>
-              
-              {/* Preview das habilidades */}
-              {formData.habilidades.length > 0 && (
-                <div className="mt-3 sm:mt-4">
-                  <p className="text-sm font-medium text-gray-700 mb-1 sm:mb-2">Pré-visualização:</p>
-                  <div className="flex flex-wrap gap-1 sm:gap-2">
-                    {formData.habilidades.map((skill, idx) => (
-                      <span key={idx} className="bg-blue-100 text-blue-800 text-xs sm:text-sm px-2 sm:px-3 py-1 rounded-full">
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {/* Idiomas */}
-          <div id="idiomas" className={`space-y-4 sm:space-y-6 ${activeSection !== "idiomas" && "hidden"}`}>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                </svg>
-                {t.campos.idiomas}
-              </h2>
-              <button
-                type="button"
-                onClick={() => addField("idiomas", { idioma: "", nivel: "" })}
-                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg transition-colors w-full sm:w-auto justify-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-                </svg>
-                {t.botoes.adicionarIdioma}
-              </button>
-            </div>
-            
-            {formData.idiomas.length > 0 ? (
-              renderLanguageFields()
-            ) : (
-              <div className="bg-gray-50 p-4 sm:p-6 rounded-lg border border-gray-200 text-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                </svg>
-                <p className="mt-2 text-sm text-gray-500">{t.mensagens.nenhumIdioma}</p>
-              </div>
-            )}
-          </div>
-          
-          {/* Certificações */}
-          <div id="certificacoes" className={`space-y-4 sm:space-y-6 ${activeSection !== "certificacoes" && "hidden"}`}>
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-    <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center">
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-      </svg>
-      Certificações/Cursos
-    </h2>
-    <button
-      type="button"
-      onClick={() => addField("certificacoes", { 
-        titulo: "", 
-        emissor: "", 
-        data: "", 
-        cargaHoraria: "", 
-        descricao: "" 
-      })}
-      className="flex items-center bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg transition-colors w-full sm:w-auto justify-center"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-      </svg>
-      Adicionar Certificação/Curso
-    </button>
-  </div>
+  const handleItemChange = useCallback((fieldType, itemId, property, e) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      [fieldType]: (prev[fieldType] || []).map(item =>
+        item.id === itemId ? { ...item, [property]: value } : item
+      )
+    }));
+    // Limpar mensagem de erro geral ao interagir com o form
+    if (errorMessage) setErrorMessage("");
+  }, [errorMessage, setFormData]);
 
-  {formData.certificacoes.length > 0 ? (
-    renderCertificationFields()
-  ) : (
-    <div className="bg-gray-50 p-4 sm:p-6 rounded-lg border border-gray-200 text-center">
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-      </svg>
-      <p className="mt-2 text-sm text-gray-500">Nenhuma certificação ou curso adicionado (opcional)</p>
-    </div>
-  )}
-</div>
+  const validateForm = useCallback(() => {
+    const newErrors = {};
+    if (!formData.nome || !formData.nome.trim()) newErrors.nome = t.mensagens.erroValidacao; // Usar chave de tradução
+    if (!formData.email || !formData.email.trim()) {
+      newErrors.email = t.mensagens.erroValidacao;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = t.mensagens.erroFormatoEmail;
+    }
+    // Adicionar outras validações se necessário (ex: telefone, datas)
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [formData, t]);
 
-      {/* Navegação entre seções */}
-      <div className="flex flex-col-reverse sm:flex-row justify-between pt-6 sm:pt-8 border-t border-gray-200 gap-4">
-        <button
-          type="button"
-          onClick={() => {
-            const sections = ["info", "resumo", "experiencia", "formacao", "habilidades", "idiomas", "certificacoes"];
-            const currentIndex = sections.indexOf(activeSection);
-            if (currentIndex > 0) {
-              setActiveSection(sections[currentIndex - 1]);
+  // --- Geração de PDF (Mantida da v3 - já robusta) --- 
+  const generatePDF = useCallback(async () => {
+    setSuccessMessage("");
+    setErrorMessage("");
+
+    if (!validateForm()) {
+      setErrorMessage(t.mensagens.erroValidacao);
+      const firstErrorField = Object.keys(errors)[0];
+      if (firstErrorField && formRef.current) {
+          const errorElement = formRef.current.querySelector(`[name="${firstErrorField}"], #${firstErrorField}`);
+          if (errorElement) {
+              errorElement.focus({ preventScroll: true });
+              errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+      }
+      return;
+    }
+
+    setIsGenerating(true);
+
+    try {
+      const pdfDoc = await PDFDocument.create();
+      const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      let page = pdfDoc.addPage(PageSizes.A4);
+      const { width, height } = page.getSize();
+      const margin = 50;
+      const contentWidth = width - 2 * margin;
+
+      const textColor = rgb(0.15, 0.15, 0.15);
+      const headerColor = rgb(0.1, 0.1, 0.1);
+      const sectionColor = rgb(0.25, 0.25, 0.25);
+      const linkColor = rgb(0.0, 0.0, 0.8);
+      const subtleColor = rgb(0.4, 0.4, 0.4);
+
+      let y = height - margin;
+      let annotations = [];
+
+      // Função auxiliar segura para obter largura do texto
+      const getTextWidth = (text, font, size) => {
+        try {
+            const widthVal = font.widthOfTextAtSize(text, size);
+            return isNaN(widthVal) ? 0 : widthVal; // Retorna 0 se NaN
+        } catch (e) {
+            console.error(`Error getting text width for: "${text}"`, e);
+            return 0; // Retorna 0 em caso de erro
+        }
+      };
+
+      const checkPageSpace = (neededSpace) => {
+        if (y - neededSpace < margin) {
+          if (annotations.length > 0) {
+              page.node.set(pdfDoc.context.obj('Annots'), pdfDoc.context.obj(annotations));
+          }
+          annotations = [];
+          page.drawText(`${t.secoesPDF.contato}: ${formData.email || ""}`, { x: margin, y: margin / 2, size: 8, font: helveticaFont, color: subtleColor });
+          page = pdfDoc.addPage(PageSizes.A4);
+          y = height - margin;
+          return true;
+        }
+        return false;
+      };
+
+      const drawText = (text, x, yPos, options = {}) => {
+        const { font = helveticaFont, size = 10, color = textColor, align = 'left', maxWidth = contentWidth, url = null } = options;
+        const sanitizedText = sanitizeInput(text || "");
+        if (!sanitizedText) return { height: 0, textWidth: 0 };
+
+        let xPos = x;
+        const textWidthValue = getTextWidth(sanitizedText, font, size); // Usa função segura
+        const validMaxWidth = isNaN(maxWidth) ? contentWidth : maxWidth;
+
+        if (align === 'center') {
+          xPos = x + (validMaxWidth - textWidthValue) / 2;
+        } else if (align === 'right') {
+          xPos = x + validMaxWidth - textWidthValue;
+        }
+
+        // Verificação final de NaN/Infinity antes de desenhar
+        if (isNaN(xPos) || !isFinite(xPos)) {
+            console.error(`Final xPos is NaN/Infinite. Original x: ${x}, align: ${align}, maxWidth: ${validMaxWidth}, textWidth: ${textWidthValue}, text: "${sanitizedText}"`);
+            xPos = margin; // Fallback para margem
+        }
+        if (isNaN(yPos) || !isFinite(yPos)) {
+             console.error(`Final yPos is NaN/Infinite. Original yPos: ${yPos}, text: "${sanitizedText}"`);
+             return { height: 0, textWidth: 0 }; // Não desenha se y for inválido
+        }
+
+        page.drawText(sanitizedText, { x: xPos, y: yPos, size, font, color });
+
+        if (url && textWidthValue > 0) {
+            try {
+                const uri = pdfDoc.context.obj(url);
+                const rectX1 = xPos;
+                const rectY1 = yPos;
+                const rectX2 = xPos + textWidthValue;
+                const rectY2 = yPos + size;
+
+                if (![rectX1, rectY1, rectX2, rectY2].some(isNaN) && [rectX1, rectY1, rectX2, rectY2].every(isFinite)) {
+                    const rect = [rectX1, rectY1, rectX2, rectY2];
+                    annotations.push(pdfDoc.context.obj({
+                        Type: 'Annot', Subtype: 'Link', Rect: rect, Border: [0, 0, 0],
+                        A: { Type: 'Action', S: 'URI', URI: uri }
+                    }));
+                } else {
+                    console.warn(`Skipping link annotation due to invalid coordinates for: ${url}`, {rectX1, rectY1, rectX2, rectY2});
+                }
+            } catch (linkError) {
+                console.warn("Não foi possível criar anotação de link para:", url, linkError);
             }
-          }}
-          disabled={activeSection === "info"}
-          className={`flex items-center justify-center px-4 sm:px-6 py-2 sm:py-3 rounded-lg transition-colors ${
-            activeSection === "info" ? "text-gray-400 cursor-not-allowed" : "text-blue-600 hover:bg-blue-50"
-          }`}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
-          Anterior
-</button>
-            
-            {activeSection !== "certificacoes" ? (
-              <button
-                type="button"
-                onClick={() => {
-                  const sections = ["info", "resumo", "experiencia", "formacao", "habilidades", "idiomas", "certificacoes"];
-                  const currentIndex = sections.indexOf(activeSection);
-                  if (currentIndex < sections.length - 1) {
-                    setActiveSection(sections[currentIndex + 1]);
+        }
+
+        return { height: size, textWidth: textWidthValue };
+      };
+
+      const drawWrappedText = (text, x, yPos, options = {}) => {
+        const { font = helveticaFont, size = 10, color = textColor, maxWidth = contentWidth, lineSpacing = 1.35, url = null } = options;
+        if (!text) return 0;
+        const sanitizedText = sanitizeInput(text);
+        const words = sanitizedText.split(/(\s+)/); // Mantém espaços para cálculo correto
+        let line = '';
+        let currentYWrapped = yPos;
+        let totalHeight = 0;
+        const lineHeight = size * lineSpacing;
+
+        for (let i = 0; i < words.length; i++) {
+          const word = words[i];
+          const testLine = line + word;
+          const testWidth = getTextWidth(testLine, font, size); // Usa função segura
+
+          if (testWidth > maxWidth && line.length > 0) {
+            drawText(line.trimEnd(), x, currentYWrapped, { font, size, color, maxWidth, url });
+            line = word.trimStart();
+            currentYWrapped -= lineHeight;
+            totalHeight += lineHeight;
+            if (checkPageSpace(lineHeight)) {
+                 currentYWrapped = y; // y foi atualizado por checkPageSpace
+            }
+          } else {
+            line = testLine;
+          }
+        }
+
+        if (line.trim().length > 0) {
+          drawText(line.trimEnd(), x, currentYWrapped, { font, size, color, maxWidth, url });
+          totalHeight += lineHeight;
+        }
+
+        return totalHeight > 0 ? totalHeight : size; // Retorna pelo menos a altura de uma linha
+      };
+
+      const drawSection = (title, yPos) => {
+        if (checkPageSpace(30)) {
+            yPos = y; // y foi atualizado por checkPageSpace
+        }
+        const { height: titleHeight } = drawText(title, margin, yPos, { font: helveticaBold, size: 12, color: sectionColor });
+        // page.drawLine({ start: { x: margin, y: yPos - titleHeight - 8 }, end: { x: width - margin, y: yPos - titleHeight - 8 }, thickness: 0.8, color: rgb(0.85, 0.85, 0.85) }); // Linha removida conforme solicitado
+        return titleHeight + 12; // Retorna a altura usada pela seção
+      };
+
+      // --- Desenho do Conteúdo do PDF --- 
+
+      // Nome e Cargo
+      const { height: nameHeight } = drawText(formData.nome, margin, y, { font: helveticaBold, size: 18, color: headerColor });
+      y -= nameHeight + 6;
+      if (formData.cargoDesejado) {
+        const { height: cargoHeight } = drawText(formData.cargoDesejado, margin, y, { font: helveticaFont, size: 12, color: sectionColor });
+        y -= cargoHeight + 18;
+      } else {
+        y -= 18;
+      }
+
+      // Contato (Linha 1)
+      let contactLine1 = [];
+      if (formData.email) contactLine1.push({ text: formData.email, url: `mailto:${formData.email}` });
+      const phone = `${formData.codigoPais || ""} ${formData.ddd || ""} ${formData.telefone || ""}`.trim();
+      if (phone) contactLine1.push({ text: phone });
+      if (formData.cidade) contactLine1.push({ text: formData.cidade });
+
+      if (contactLine1.length > 0) {
+          let currentX = margin;
+          const contactSize = 9.5;
+          const separator = "  |  ";
+          const separatorWidth = getTextWidth(separator, helveticaFont, contactSize); // Usa função segura
+
+          contactLine1.forEach((item, index) => {
+              const { textWidth: itemWidth } = drawText(item.text, currentX, y, { size: contactSize, color: item.url ? linkColor : textColor, url: item.url });
+              currentX += itemWidth;
+              if (index < contactLine1.length - 1) {
+                  drawText(separator, currentX, y, { size: contactSize, color: subtleColor });
+                  currentX += separatorWidth;
+              }
+              if (isNaN(currentX)) {
+                  console.error("currentX became NaN in contact loop. Resetting.");
+                  currentX = margin; // Reseta se NaN
+              }
+          });
+          y -= contactSize + 5;
+      }
+
+      // Links (Linha 2)
+      if (formData.links && formData.links.length > 0) {
+          let currentXLinks = margin;
+          const linkSize = 9.5;
+          const separator = "  |  ";
+          const separatorWidth = getTextWidth(separator, helveticaFont, linkSize); // Usa função segura
+          let firstLink = true;
+
+          formData.links.forEach((link) => {
+              if (!link.url) return;
+              const cleanUrl = link.url.trim();
+              const displayUrl = cleanUrl.replace(/^(https?:\/\/)?(www\.)?/, '');
+              const fullUrl = cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`;
+
+              const linkWidth = getTextWidth(displayUrl, helveticaFont, linkSize); // Usa função segura
+              const separatorW = firstLink ? 0 : separatorWidth;
+
+              // Quebra de linha se não couber
+              if (currentXLinks + separatorW + linkWidth > width - margin) {
+                  y -= linkSize + 3;
+                  currentXLinks = margin;
+                  firstLink = true;
+                  if(checkPageSpace(linkSize + 3)) { /* y updated */ }
+              }
+
+              if (!firstLink) {
+                  drawText(separator, currentXLinks, y, { size: linkSize, color: subtleColor });
+                  currentXLinks += separatorWidth;
+              }
+
+              drawText(displayUrl, currentXLinks, y, { size: linkSize, color: linkColor, url: fullUrl });
+              currentXLinks += linkWidth;
+              firstLink = false;
+
+              if (isNaN(currentXLinks)) {
+                  console.error("currentXLinks became NaN in links loop. Resetting.");
+                  currentXLinks = margin; // Reseta se NaN
+              }
+          });
+          y -= linkSize + 25; // Espaço maior após links
+      }
+
+      // Resumo
+      if (formData.resumo) {
+        y -= drawSection(t.secoesPDF.resumo, y);
+        const resumoHeight = drawWrappedText(formData.resumo, margin, y, { size: 10, lineSpacing: 1.4 });
+        y -= resumoHeight + 25;
+      }
+
+      // Experiência
+      if (formData.experiencias && formData.experiencias.length > 0) {
+        y -= drawSection(t.secoesPDF.experiencia, y);
+        const drawList = (text, x, startYList, options = {}) => {
+            const { font = helveticaFont, size = 10, color = textColor, maxWidth = contentWidth, lineSpacing = 1.35 } = options;
+            if (!text) return startYList;
+            let currentYList = startYList;
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+            lines.forEach(line => {
+                if(checkPageSpace(20)) {
+                    currentYList = y; // y foi atualizado
+                }
+                const marker = line.trim().startsWith('-') ? '•' : '';
+                const content = marker ? line.trim().substring(1).trim() : line.trim();
+                let markerWidth = 0;
+                if (marker) {
+                    const { textWidth } = drawText(marker, x, currentYList, { font, size, color });
+                    markerWidth = textWidth + 4; // Mais espaço após o bullet
+                }
+                const lineHeight = drawWrappedText(content, x + markerWidth, currentYList, { font, size, color, maxWidth: maxWidth - markerWidth, lineSpacing });
+                currentYList -= lineHeight;
+            });
+            return currentYList;
+        };
+        for (const exp of formData.experiencias) {
+          const startYExp = y;
+          if(checkPageSpace(120)) { /* y updated */ }
+
+          // Cargo e Empresa na mesma linha (se couber)
+          const cargoText = exp.cargo || "";
+          const empresaText = exp.empresa || "";
+          const cargoWidth = getTextWidth(cargoText, helveticaBold, 11);
+          const empresaWidth = getTextWidth(` - ${empresaText}`, helveticaFont, 10);
+          const periodoText = `${exp.mesInicio && exp.anoInicio ? `${exp.mesInicio}/${exp.anoInicio}` : ""} - ${exp.atual ? t.labelAtual : (exp.mesFim && exp.anoFim ? `${exp.mesFim}/${exp.anoFim}` : "")}`.trim();
+          const periodoWidth = getTextWidth(periodoText, helveticaFont, 10);
+
+          if (cargoWidth + empresaWidth + periodoWidth + 20 < contentWidth) {
+              // Desenha Cargo e Empresa juntos
+              drawText(cargoText, margin, y, { font: helveticaBold, size: 11 });
+              drawText(` - ${empresaText}`, margin + cargoWidth, y, { size: 10 });
+              // Desenha Período à direita
+              drawText(periodoText, margin, y, { size: 10, align: 'right', color: subtleColor, maxWidth: contentWidth });
+              y -= 11 * 1.3; // Altura aproximada
+          } else {
+              // Desenha Cargo e Período
+              drawText(cargoText, margin, y, { font: helveticaBold, size: 11 });
+              drawText(periodoText, margin, y, { size: 10, align: 'right', color: subtleColor, maxWidth: contentWidth });
+              y -= 11 * 1.3;
+              // Desenha Empresa abaixo
+              const { height: empresaHeight } = drawText(empresaText, margin, y, { size: 10 });
+              y -= empresaHeight + 5;
+          }
+
+          // Tecnologias
+          if (exp.tecnologias) {
+             if(checkPageSpace(25)) { /* y updated */ }
+             const techText = `${t.secoesPDF.tecnologias}: ${exp.tecnologias}`;
+             const techHeight = drawWrappedText(techText, margin, y, { size: 9.5, color: subtleColor, lineSpacing: 1.3 });
+             y -= techHeight + 8;
+          }
+
+          // Atividades e Resultados
+          if (exp.atividades) {
+              y = drawList(exp.atividades, margin + 5, y, { size: 10, maxWidth: contentWidth - 5 });
+              y -= 5;
+          }
+          if (exp.resultados) {
+              y = drawList(exp.resultados, margin + 5, y, { size: 10, maxWidth: contentWidth - 5 });
+              y -= 5;
+          }
+          y -= 15; // Espaço entre experiências
+        }
+      }
+
+      // Formação
+      if (formData.formacoes && formData.formacoes.length > 0) {
+        y -= drawSection(t.secoesPDF.formacao, y);
+        for (const form of formData.formacoes) {
+          if(checkPageSpace(80)) { /* y updated */ }
+
+          const tipoFormacao = tiposCurso.find(tc => tc.valor === form.tipo);
+          const tipoLabel = tipoFormacao ? (tipoFormacao[`label_${idiomaApp}`] || tipoFormacao.label) : "";
+          const cursoText = `${tipoLabel}${form.curso ? ` - ${form.curso}` : ""}`;
+          const { height: cursoHeight } = drawText(cursoText, margin, y, { font: helveticaBold, size: 11 });
+          y -= cursoHeight + 3;
+
+          if (form.instituicao) {
+            const { height: instHeight } = drawText(form.instituicao, margin, y, { size: 10 });
+            y -= instHeight + 3;
+          }
+
+          let statusText = "";
+          const statusObj = statusFormacao.find(sf => sf.valor === form.status);
+          if (statusObj) statusText = statusObj[`label_${idiomaApp}`] || statusObj.label;
+          let periodoText = "";
+          if (form.mesInicio && form.anoInicio) {
+            periodoText = `${form.mesInicio}/${form.anoInicio}`;
+            if (form.status === "andamento") {
+              periodoText += ` - ${t.labelAtual}`;
+            } else if (form.mesFim && form.anoFim) {
+              periodoText += ` - ${form.mesFim}/${form.anoFim}`;
+            }
+          }
+          const statusPeriodoText = `${statusText}${periodoText ? ` | ${periodoText}` : ""}`;
+          if (statusPeriodoText) {
+            const { height: statusHeight } = drawText(statusPeriodoText, margin, y, { size: 9.5, color: subtleColor });
+            y -= statusHeight + 8;
+          }
+
+          if (form.descricao) {
+            if(checkPageSpace(30)) { /* y updated */ }
+            const descHeight = drawWrappedText(form.descricao, margin + 10, y, { size: 9.5, maxWidth: contentWidth - 10, lineSpacing: 1.3 });
+            y -= descHeight + 5;
+          }
+          y -= 15; // Espaço entre formações
+        }
+      }
+
+      // Seções em Coluna (Habilidades, Idiomas, Certificações)
+      const drawColumnSectionContent = (sectionType, x, startYCol, colWidth) => {
+          let currentYCol = startYCol;
+          if (sectionType === 'habilidades' && formData.habilidades?.length > 0) {
+              const text = formData.habilidades.join(', ');
+              const h = drawWrappedText(text, x, currentYCol, { size: 10, maxWidth: colWidth, lineSpacing: 1.4 });
+              currentYCol -= h + 15;
+          } else if (sectionType === 'idiomas' && formData.idiomas?.length > 0) {
+              formData.idiomas.forEach(idioma => {
+                  if(checkPageSpace(20)) {
+                      currentYCol = y; // y foi atualizado
                   }
-                }}
-                className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg transition-colors shadow-md hover:shadow-lg"
-              >
-                Próximo
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                </svg>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => gerarPDF()}
-                disabled={isGenerating}
-                className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg text-white font-medium flex items-center justify-center transition-all ${
-                  isGenerating ? "bg-gray-500 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg"
-                }`}
-              >
-                {isGenerating ? (
+                  const text = `${idioma.idioma} - ${idioma.nivel}`;
+                  const { height: h } = drawText(text, x, currentYCol, { size: 10, maxWidth: colWidth });
+                  currentYCol -= h + 5;
+              });
+              currentYCol -= 10;
+          } else if (sectionType === 'certificacoes' && formData.certificacoes?.length > 0) {
+              formData.certificacoes.forEach(cert => {
+                  if(checkPageSpace(60)) {
+                     currentYCol = y; // y foi atualizado
+                  }
+                  const { height: titleH } = drawText(cert.certificacao, x, currentYCol, { font: helveticaBold, size: 10 });
+                  currentYCol -= titleH + 3;
+                  const instText = `${cert.instituicaoEmissora}${cert.dataCertificacao ? ` | ${cert.dataCertificacao}` : ""}${cert.cargaHoraria ? ` (${cert.cargaHoraria})` : ""}`;
+                  if (instText.trim() !== "|") {
+                      const { height: instH } = drawText(instText, x, currentYCol, { size: 9, color: subtleColor });
+                      currentYCol -= instH + 5;
+                  }
+                  if (cert.descricao) {
+                      const descH = drawWrappedText(cert.descricao, x + 5, currentYCol, { size: 9, maxWidth: colWidth - 5, lineSpacing: 1.3 });
+                      currentYCol -= descH + 5;
+                  }
+                  if (cert.linkValidacao) {
+                      const cleanUrl = cert.linkValidacao.trim();
+                      const fullUrl = cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`;
+                      const displayUrl = cleanUrl.replace(/^(https?:\/\/)?(www\.)?/, '');
+                      const linkText = `${t.secoesPDF.validacao}: ${displayUrl}`;
+                      const linkH = drawWrappedText(linkText, x + 5, currentYCol, { size: 8, color: linkColor, maxWidth: colWidth - 5, url: fullUrl });
+                      currentYCol -= linkH + 8;
+                  } else {
+                      currentYCol -= 8;
+                  }
+              });
+          }
+          return currentYCol;
+      };
+
+      const sections = [
+          { type: 'habilidades', title: t.secoesPDF.habilidades, data: formData.habilidades },
+          { type: 'idiomas', title: t.secoesPDF.idiomas, data: formData.idiomas },
+          { type: 'certificacoes', title: t.secoesPDF.certificacoes, data: formData.certificacoes },
+      ].filter(s => s.data && s.data.length > 0);
+
+      for (const section of sections) {
+          y -= drawSection(section.title, y);
+          y = drawColumnSectionContent(section.type, margin, y, contentWidth);
+          y -= 10; // Espaço após a seção
+      }
+
+      // Adiciona anotações à página final
+      if (annotations.length > 0) {
+          page.node.set(pdfDoc.context.obj('Annots'), pdfDoc.context.obj(annotations));
+      }
+
+      // Rodapé da página (opcional, pode poluir ATS)
+      // page.drawText(`${t.secoesPDF.contato}: ${formData.email || ""}`, { x: margin, y: margin / 2, size: 8, font: helveticaFont, color: subtleColor });
+
+      // Salvar e Download
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      const filenameBase = formData.nome ? formData.nome.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'curriculo';
+      link.download = `${filenameBase}_ats_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+
+      setSuccessMessage(t.mensagens.sucesso);
+      setTimeout(() => setSuccessMessage(""), 5000);
+
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      if (error instanceof TypeError && error.message.includes('NaN')) {
+          setErrorMessage(t.mensagens.erroNaN);
+      } else {
+          setErrorMessage(t.mensagens.erroGeracao + `: ${error.message || 'Erro desconhecido'}`);
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [formData, idiomaApp, t, validateForm, errors]); // Adicionado 'errors' como dependência
+
+  // --- Renderização de Seções do Formulário (Refinadas) --- 
+  const renderPersonalInfoFields = useCallback(() => (
+    <SectionCard title={t.secoesPDF.contato}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+        <InputField
+          id="nome"
+          label={t.campos.nome}
+          name="nome"
+          placeholder={t.placeholders.nome}
+          value={formData.nome}
+          onChange={handleChange}
+          error={errors.nome}
+          warning={!formData.nome?.trim()}
+          icon="👤"
+        />
+        <InputField
+          id="cargoDesejado"
+          label={t.campos.cargoDesejado}
+          name="cargoDesejado"
+          placeholder={t.placeholders.cargoDesejado}
+          value={formData.cargoDesejado}
+          onChange={handleChange}
+          icon="🎯"
+        />
+        <InputField
+          id="email"
+          label={t.campos.email}
+          name="email"
+          placeholder={t.placeholders.email}
+          value={formData.email}
+          onChange={handleChange}
+          error={errors.email}
+          warning={!formData.email?.trim()}
+          type="email"
+          icon="✉️"
+        />
+        <div className="grid grid-cols-12 gap-2 items-end">
+          <SelectField
+            id="codigoPais"
+            label={t.campos.codigoPais}
+            name="codigoPais"
+            value={formData.codigoPais}
+            onChange={handleChange}
+            options={paisesTelefone.map(p => ({ value: p.codigo, label: p.nome }))}
+            className="col-span-4 sm:col-span-3"
+            defaultOptionLabel="Cód."
+          />
+          <InputField
+            id="ddd"
+            label={t.campos.ddd}
+            name="ddd"
+            value={formData.ddd}
+            onChange={handleChange}
+            placeholder={t.placeholders.ddd}
+            className="col-span-3 sm:col-span-3"
+            type="tel"
+          />
+          <InputField
+            id="telefone"
+            label={t.campos.telefone}
+            name="telefone"
+            value={formData.telefone}
+            onChange={handleChange}
+            placeholder={t.placeholders.telefone}
+            className="col-span-5 sm:col-span-6"
+            type="tel"
+          />
+        </div>
+        <InputField id="cidade" label={t.campos.cidade} name="cidade" placeholder={t.placeholders.cidade} value={formData.cidade} onChange={handleChange} icon="📍" className="md:col-span-2" />
+      </div>
+      {/* Seção de Links Refinada */}
+      <div className="pt-5 mt-5 border-t border-gray-200/80">
+        <label className="block text-base font-semibold text-gray-800 mb-4">{t.secoesPDF.links}</label>
+        <div className="space-y-2 mb-4">
+          {(formData.links || []).map((link) => (
+            <div key={link.id} className="flex items-center justify-between bg-gray-50/70 rounded-md px-3 py-2 text-sm border border-gray-200/80 shadow-sm hover:bg-gray-100 transition-colors">
+              <div className="flex items-center overflow-hidden mr-2">
+                 <span className="font-medium mr-2 text-indigo-700 flex-shrink-0">{tiposLinks.find(t => t.valor === link.tipo)?.label || link.tipo}:</span>
+                 <a href={link.url && (link.url.startsWith('http://') || link.url.startsWith('https://')) ? link.url : `https://${link.url || ''}`} target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-indigo-600 truncate transition-colors" title={link.url}>{link.url}</a>
+              </div>
+              <RemoveButton
+                onClick={() => handleRemoveItem("links", link.id)}
+                title={`${t.botoes.remover} ${t.campos.tipoLink}`}
+                className="flex-shrink-0"
+              />
+            </div>
+          ))}
+           {(formData.links || []).length === 0 && (
+             <p className="text-sm text-gray-500 italic px-3 py-2">Nenhum link adicionado.</p>
+           )}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 border-t border-gray-200/80 pt-4">
+          <SelectField
+            id="link-tipo-new"
+            label={t.campos.tipoLink}
+            name="newLinkTipo"
+            value={tempFields.newLinkTipo || "linkedin"}
+            onChange={handleChange}
+            options={tiposLinks.map(tipo => ({ value: tipo.valor, label: t.campos[tipo.valor] || tipo.label }))}
+            className="text-sm"
+            defaultOptionLabel={t.placeholders.tipoLink}
+          />
+          <InputField
+            id="link-url-new"
+            label={t.campos.urlLink}
+            name="newLinkUrl"
+            value={tempFields.newLinkUrl || ""}
+            onChange={handleChange}
+            placeholder={tiposLinks.find(t => t.valor === (tempFields.newLinkTipo || "linkedin"))?.prefixo ?
+              `${tiposLinks.find(t => t.valor === (tempFields.newLinkTipo || "linkedin"))?.prefixo}seu-usuario` :
+              t.placeholders.urlLink}
+            className="md:col-span-2 text-sm"
+            type="url"
+          />
+        </div>
+        <AddItemButton
+          onClick={() => addField("links")}
+          label={t.botoes.adicionarLink}
+        />
+      </div>
+    </SectionCard>
+  ), [t, formData, tempFields, handleChange, errors, handleRemoveItem, addField]);
+
+  const renderResumoField = useCallback(() => (
+    <SectionCard title={t.campos.resumo}>
+      <TextareaField id="resumo-text" label="" name="resumo" placeholder={t.placeholders.resumo} value={formData.resumo} onChange={handleChange} warning={!formData.resumo?.trim()} rows={6} />
+    </SectionCard>
+  ), [t, formData.resumo, handleChange]);
+
+  const renderExperienceFields = useCallback(() => (
+    <SectionCard title={t.campos.experiencia}>
+      {(formData.experiencias || []).length === 0 ? (
+        <p className="text-sm text-gray-500 italic text-center py-4 bg-gray-50/70 rounded-lg border border-dashed border-gray-300">{t.mensagens.nenhumaExperiencia}</p>
+      ) : (
+        <div className="space-y-3">
+          {(formData.experiencias || []).map((exp, index) => (
+            <ItemCard
+              key={exp.id}
+              index={index}
+              onRemove={() => handleRemoveItem("experiencias", exp.id)}
+              removeTitle={`${t.botoes.remover} ${t.campos.experiencia}`}
+              summaryHeader={(
+                <>
+                  <h4 className="font-semibold text-gray-800 truncate">{exp.cargo || `(${t.campos.cargo})`}</h4>
+                  <p className="text-xs text-gray-600 truncate">{exp.empresa || `(${t.campos.empresa})`} | {exp.mesInicio && exp.anoInicio ? `${exp.mesInicio}/${exp.anoInicio}` : ""} - {exp.atual ? t.labelAtual : (exp.mesFim && exp.anoFim ? `${exp.mesFim}/${exp.anoFim}` : "")}</p>
+                </>
+              )}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputField id={`exp-cargo-${exp.id}`} label={t.campos.cargo} name={`exp-cargo-${exp.id}`} placeholder={t.placeholders.cargo} value={exp.cargo} onChange={(e) => handleItemChange("experiencias", exp.id, "cargo", e)} />
+                <InputField id={`exp-empresa-${exp.id}`} label={t.campos.empresa} name={`exp-empresa-${exp.id}`} placeholder={t.placeholders.empresa} value={exp.empresa} onChange={(e) => handleItemChange("experiencias", exp.id, "empresa", e)} />
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end border-t border-gray-100 pt-4 mt-4">
+                <SelectField
+                  id={`exp-mesInicio-${exp.id}`}
+                  label={t.campos.mesInicio}
+                  name={`exp-mesInicio-${exp.id}`}
+                  value={exp.mesInicio || ""}
+                  onChange={(e) => handleItemChange("experiencias", exp.id, "mesInicio", e)}
+                  options={meses.map(m => ({ value: m, label: m }))}
+                  className="col-span-1 text-xs"
+                  defaultOptionLabel={t.placeholders.mes}
+                />
+                <InputField
+                  id={`exp-anoInicio-${exp.id}`}
+                  label={t.campos.anoInicio}
+                  name={`exp-anoInicio-${exp.id}`}
+                  value={exp.anoInicio || ""}
+                  onChange={(e) => handleItemChange("experiencias", exp.id, "anoInicio", e)}
+                  placeholder={t.placeholders.ano}
+                  className="col-span-1 text-xs"
+                  type="number" min="1950" max={new Date().getFullYear()}
+                />
+                {!exp.atual && (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 sm:h-5 sm:w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span className="text-sm sm:text-base">{t.mensagens.gerando}</span>
-                  </>
-                ) : (
-                  <>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span className="text-sm sm:text-base">{t.botoes.gerarCV}</span>
+                    <SelectField
+                      id={`exp-mesFim-${exp.id}`}
+                      label={t.campos.mesFim}
+                      name={`exp-mesFim-${exp.id}`}
+                      value={exp.mesFim || ""}
+                      onChange={(e) => handleItemChange("experiencias", exp.id, "mesFim", e)}
+                      options={meses.map(m => ({ value: m, label: m }))}
+                      className="col-span-1 text-xs"
+                      defaultOptionLabel={t.placeholders.mes}
+                    />
+                    <InputField
+                      id={`exp-anoFim-${exp.id}`}
+                      label={t.campos.anoFim}
+                      name={`exp-anoFim-${exp.id}`}
+                      value={exp.anoFim || ""}
+                      onChange={(e) => handleItemChange("experiencias", exp.id, "anoFim", e)}
+                      placeholder={t.placeholders.ano}
+                      className="col-span-1 text-xs"
+                      type="number" min="1950" max={new Date().getFullYear() + 10}
+                    />
                   </>
                 )}
-              </button>
-            )}
+                <div className={`flex items-center ${exp.atual ? "md:col-span-3" : "md:col-span-1"} justify-start md:justify-end pt-5 md:pt-0`}>
+                  <input type="checkbox" id={`exp-atual-${exp.id}`} checked={exp.atual || false} onChange={(e) => handleItemChange("experiencias", exp.id, "atual", e)} className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer" />
+                  <label htmlFor={`exp-atual-${exp.id}`} className="ml-2 block text-sm text-gray-700 cursor-pointer">{t.campos.atual}</label>
+                </div>
+              </div>
+
+              <InputField id={`exp-tech-${exp.id}`} label={t.campos.tecnologias} name={`exp-tech-${exp.id}`} placeholder={t.placeholders.tecnologias} value={exp.tecnologias} onChange={(e) => handleItemChange("experiencias", exp.id, "tecnologias", e)} className="mt-3" />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                <TextareaField id={`exp-ativ-${exp.id}`} label={t.campos.atividades} name={`exp-ativ-${exp.id}`} placeholder={t.placeholders.atividades} value={exp.atividades} onChange={(e) => handleItemChange("experiencias", exp.id, "atividades", e)} rows={4} />
+                <TextareaField id={`exp-res-${exp.id}`} label={t.campos.resultados} name={`exp-res-${exp.id}`} placeholder={t.placeholders.resultados} value={exp.resultados} onChange={(e) => handleItemChange("experiencias", exp.id, "resultados", e)} rows={4} />
+              </div>
+            </ItemCard>
+          ))}
+        </div>
+      )}
+      <AddItemButton onClick={() => addField("experiencias")} label={t.botoes.adicionarExperiencia} />
+    </SectionCard>
+  ), [t, formData.experiencias, handleRemoveItem, handleItemChange, addField]);
+
+  const renderEducationFields = useCallback(() => (
+    <SectionCard title={t.campos.formacao}>
+      {(formData.formacoes || []).length === 0 ? (
+        <p className="text-sm text-gray-500 italic text-center py-4 bg-gray-50/70 rounded-lg border border-dashed border-gray-300">{t.mensagens.nenhumaFormacao}</p>
+      ) : (
+        <div className="space-y-3">
+          {(formData.formacoes || []).map((form, index) => (
+            <ItemCard
+              key={form.id}
+              index={index}
+              onRemove={() => handleRemoveItem("formacoes", form.id)}
+              removeTitle={`${t.botoes.remover} ${t.campos.formacao}`}
+              summaryHeader={(
+                 <>
+                  <h4 className="font-semibold text-gray-800 truncate">
+                    {tiposCurso.find(tc => tc.valor === form.tipo)?.[`label_${idiomaApp}`] || tiposCurso.find(tc => tc.valor === form.tipo)?.label || `(${t.campos.tipoFormacao})`}
+                    {form.curso ? ` - ${form.curso}` : ''}
+                  </h4>
+                  <p className="text-xs text-gray-600 truncate">
+                    {form.instituicao || `(${t.campos.instituicao})`} | {form.mesInicio && form.anoInicio ? `${form.mesInicio}/${form.anoInicio}` : ""} - {form.status === "andamento" ? t.labelAtual : (form.mesFim && form.anoFim ? `${form.mesFim}/${form.anoFim}` : "")}
+                  </p>
+                  <p className="text-xs text-indigo-600 font-medium mt-0.5">
+                    {statusFormacao.find(sf => sf.valor === form.status)?.[`label_${idiomaApp}`] || statusFormacao.find(sf => sf.valor === form.status)?.label}
+                  </p>
+                </>
+              )}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <SelectField id={`form-tipo-${form.id}`} label={t.campos.tipoFormacao} name={`form-tipo-${form.id}`} value={form.tipo || "superior"} onChange={(e) => handleItemChange("formacoes", form.id, "tipo", e)}
+                  options={tiposCurso.map(tc => ({ value: tc.valor, label: tc[`label_${idiomaApp}`] || tc.label }))}
+                  defaultOptionLabel={t.placeholders.tipoLink} />
+                <InputField id={`form-curso-${form.id}`} label={t.campos.curso} name={`form-curso-${form.id}`} placeholder={t.placeholders.curso} value={form.curso} onChange={(e) => handleItemChange("formacoes", form.id, "curso", e)} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                <InputField id={`form-inst-${form.id}`} label={t.campos.instituicao} name={`form-inst-${form.id}`} placeholder={t.placeholders.instituicao} value={form.instituicao} onChange={(e) => handleItemChange("formacoes", form.id, "instituicao", e)} />
+                <SelectField id={`form-status-${form.id}`} label={t.campos.status} name={`form-status-${form.id}`} value={form.status || "completo"} onChange={(e) => handleItemChange("formacoes", form.id, "status", e)}
+                  options={statusFormacao.map(sf => ({ value: sf.valor, label: sf[`label_${idiomaApp}`] || sf.label }))}
+                  defaultOptionLabel={t.campos.status} />
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end border-t border-gray-100 pt-4 mt-4">
+                <SelectField
+                  id={`form-mesInicio-${form.id}`}
+                  label={t.campos.mesInicio}
+                  name={`form-mesInicio-${form.id}`}
+                  value={form.mesInicio || ""}
+                  onChange={(e) => handleItemChange("formacoes", form.id, "mesInicio", e)}
+                  options={meses.map(m => ({ value: m, label: m }))}
+                  className="col-span-1 text-xs"
+                  defaultOptionLabel={t.placeholders.mes}
+                />
+                <InputField
+                  id={`form-anoInicio-${form.id}`}
+                  label={t.campos.anoInicio}
+                  name={`form-anoInicio-${form.id}`}
+                  value={form.anoInicio || ""}
+                  onChange={(e) => handleItemChange("formacoes", form.id, "anoInicio", e)}
+                  placeholder={t.placeholders.ano}
+                  className="col-span-1 text-xs"
+                  type="number" min="1950" max={new Date().getFullYear()}
+                />
+                {form.status !== "andamento" && (
+                  <>
+                    <SelectField
+                      id={`form-mesFim-${form.id}`}
+                      label={t.campos.mesFim}
+                      name={`form-mesFim-${form.id}`}
+                      value={form.mesFim || ""}
+                      onChange={(e) => handleItemChange("formacoes", form.id, "mesFim", e)}
+                      options={meses.map(m => ({ value: m, label: m }))}
+                      className="col-span-1 text-xs"
+                      defaultOptionLabel={t.placeholders.mes}
+                    />
+                    <InputField
+                      id={`form-anoFim-${form.id}`}
+                      label={t.campos.anoFim}
+                      name={`form-anoFim-${form.id}`}
+                      value={form.anoFim || ""}
+                      onChange={(e) => handleItemChange("formacoes", form.id, "anoFim", e)}
+                      placeholder={t.placeholders.ano}
+                      className="col-span-1 text-xs"
+                      type="number" min="1950" max={new Date().getFullYear() + 10}
+                    />
+                  </>
+                )}
+                {form.status === "andamento" && <div className="col-span-2"></div>}
+              </div>
+
+              <TextareaField id={`form-desc-${form.id}`} label={t.campos.descricaoCertificacao} name={`form-desc-${form.id}`} placeholder={t.placeholders.descricaoCertificacao} value={form.descricao} onChange={(e) => handleItemChange("formacoes", form.id, "descricao", e)} rows={3} className="mt-3" />
+            </ItemCard>
+          ))}
+        </div>
+      )}
+      <AddItemButton onClick={() => addField("formacoes")} label={t.botoes.adicionarFormacao} />
+    </SectionCard>
+  ), [t, formData.formacoes, idiomaApp, handleRemoveItem, handleItemChange, addField]);
+
+  const renderHabilidadesField = useCallback(() => (
+    <SectionCard title={t.campos.habilidades}>
+      <TextareaField id="habilidades-text" label="" name="habilidadesInput" placeholder={t.placeholders.habilidades} value={habilidadesInput} onChange={handleHabilidadesChange} onBlur={handleHabilidadesBlur} rows={3} />
+
+      <div className="mt-4 p-4 bg-gray-50/70 rounded-lg border border-gray-200/80 min-h-[60px]">
+        <p className="text-sm font-medium text-gray-700 mb-3">Habilidades adicionadas:</p>
+        <div className="flex flex-wrap">
+          {formData.habilidades.map((skill, index) => (
+            <SkillTag key={`${skill}-${index}`} skill={skill} onRemove={handleRemoveHabilidade} />
+          ))}
+          {formData.habilidades.length === 0 && (
+            <p className="text-sm text-gray-500 italic">Nenhuma habilidade adicionada. Digite acima e separe por vírgulas.</p>
+          )}
+        </div>
+      </div>
+    </SectionCard>
+  ), [t, habilidadesInput, formData.habilidades, handleHabilidadesChange, handleRemoveHabilidade]);
+
+  const renderIdiomasFields = useCallback(() => (
+    <SectionCard title={t.campos.idiomas}>
+      {(formData.idiomas || []).length === 0 ? (
+        <p className="text-sm text-gray-500 italic text-center py-4 bg-gray-50/70 rounded-lg border border-dashed border-gray-300">{t.mensagens.nenhumIdioma}</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {(formData.idiomas || []).map((idioma, index) => (
+            <ItemCard
+              key={idioma.id}
+              index={index}
+              onRemove={() => handleRemoveItem("idiomas", idioma.id)}
+              removeTitle={`${t.botoes.remover} ${t.campos.idioma}`}
+            >
+              <div className="flex flex-col space-y-3">
+                 <InputField
+                    id={`idioma-nome-${idioma.id}`}
+                    label={t.campos.idioma}
+                    name={`idioma-nome-${idioma.id}`}
+                    value={idioma.idioma || ""}
+                    onChange={(e) => handleItemChange("idiomas", idioma.id, "idioma", e)}
+                    placeholder={t.placeholders.idioma}
+                    className="text-sm"
+                  />
+                  <SelectField
+                    id={`idioma-nivel-${idioma.id}`}
+                    label={t.campos.nivel}
+                    name={`idioma-nivel-${idioma.id}`}
+                    value={idioma.nivel || t.niveisIdioma[0]}
+                    onChange={(e) => handleItemChange("idiomas", idioma.id, "nivel", e)}
+                    options={t.niveisIdioma.map((nivel) => ({ value: nivel, label: nivel }))}
+                    className="text-sm"
+                    defaultOptionLabel={t.placeholders.nivelIdioma}
+                  />
+              </div>
+            </ItemCard>
+          ))}
+        </div>
+      )}
+      <AddItemButton onClick={() => addField("idiomas")} label={t.botoes.adicionarIdioma} />
+    </SectionCard>
+  ), [t, formData.idiomas, handleRemoveItem, handleItemChange, addField]);
+
+  const renderCertificacoesFields = useCallback(() => (
+    <SectionCard title={t.campos.certificacoes}>
+      {(formData.certificacoes || []).length === 0 ? (
+        <p className="text-sm text-gray-500 italic text-center py-4 bg-gray-50/70 rounded-lg border border-dashed border-gray-300">{t.mensagens.nenhumaCertificacao}</p>
+      ) : (
+        <div className="space-y-3">
+          {(formData.certificacoes || []).map((cert, index) => (
+            <ItemCard
+              key={cert.id}
+              index={index}
+              onRemove={() => handleRemoveItem("certificacoes", cert.id)}
+              removeTitle={`${t.botoes.remover} ${t.campos.certificacao}`}
+              summaryHeader={(
+                <>
+                  <h4 className="font-semibold text-gray-800 truncate">{cert.certificacao || `(${t.campos.certificacao})`}</h4>
+                  <p className="text-xs text-gray-600 truncate">{cert.instituicaoEmissora || `(${t.campos.instituicaoEmissora})`} {cert.dataCertificacao ? `| ${cert.dataCertificacao}` : ""}</p>
+                </>
+              )}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputField id={`cert-nome-${cert.id}`} label={t.campos.certificacao} name={`cert-nome-${cert.id}`} placeholder={t.placeholders.certificacao} value={cert.certificacao} onChange={(e) => handleItemChange("certificacoes", cert.id, "certificacao", e)} />
+                <InputField id={`cert-inst-${cert.id}`} label={t.campos.instituicaoEmissora} name={`cert-inst-${cert.id}`} placeholder={t.placeholders.instituicaoEmissora} value={cert.instituicaoEmissora} onChange={(e) => handleItemChange("certificacoes", cert.id, "instituicaoEmissora", e)} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                 <InputField
+                    id={`cert-data-${cert.id}`}
+                    label={t.campos.dataCertificacao}
+                    name={`cert-data-${cert.id}`}
+                    placeholder={t.placeholders.dataCertificacao}
+                    value={cert.dataCertificacao}
+                    onChange={(e) => handleItemChange("certificacoes", cert.id, "dataCertificacao", e)}
+                  />
+                 <InputField
+                    id={`cert-carga-${cert.id}`}
+                    label={t.campos.cargaHoraria}
+                    name={`cert-carga-${cert.id}`}
+                    placeholder={t.placeholders.cargaHoraria}
+                    value={cert.cargaHoraria}
+                    onChange={(e) => handleItemChange("certificacoes", cert.id, "cargaHoraria", e)}
+                  />
+              </div>
+              <InputField id={`cert-link-${cert.id}`} label={t.campos.linkValidacao} name={`cert-link-${cert.id}`} placeholder={t.placeholders.linkValidacao} value={cert.linkValidacao} onChange={(e) => handleItemChange("certificacoes", cert.id, "linkValidacao", e)} type="url" className="mt-3" />
+              <TextareaField id={`cert-desc-${cert.id}`} label={t.campos.descricaoCertificacao} name={`cert-desc-${cert.id}`} placeholder={t.placeholders.descricaoCertificacao} value={cert.descricao} onChange={(e) => handleItemChange("certificacoes", cert.id, "descricao", e)} rows={3} className="mt-3" />
+            </ItemCard>
+          ))}
+        </div>
+      )}
+      <AddItemButton onClick={() => addField("certificacoes")} label={t.botoes.adicionarCertificacao} />
+    </SectionCard>
+  ), [t, formData.certificacoes, handleRemoveItem, handleItemChange, addField]);
+
+  // --- Renderização Principal (Layout SAAS Refinado) --- 
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50">
+      
+<header className="bg-white/95 backdrop-blur-lg shadow-sm sticky top-0 z-40 border-b border-gray-200/80">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="flex justify-between items-center py-3">
+      <div className="flex items-center">
+        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-500 shadow-md mr-3">
+          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-500 bg-clip-text text-transparent tracking-tight">
+          {t.tituloApp}
+        </span>
+      </div>
+
+      {/* Seletor de Idioma com Dropdown */}
+      <div className="relative">
+        <button 
+          onClick={() => setIsLangOpen(!isLangOpen)}
+          className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-xs hover:shadow-md transition-all group"
+          aria-label="Seletor de idioma"
+        >
+          <span className="text-sm font-medium text-gray-700">
+            {idiomaApp === 'pt' ? 'Português' : 
+             idiomaApp === 'es' ? 'Español' : 'English'}
+          </span>
+          
+          <div className="relative w-4 h-4">
+            {/* Ícone de seta padrão */}
+            <svg 
+              className={`w-4 h-4 text-gray-500 transition-transform absolute ${isLangOpen ? 'opacity-0 rotate-90' : 'opacity-100 rotate-0'}`}
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+            
+            {/* Ícone giratório quando aberto */}
+            <svg 
+              className={`w-4 h-4 text-indigo-500 absolute transition-opacity duration-300 ${isLangOpen ? 'opacity-100 animate-spin' : 'opacity-0'}`}
+              style={{ animationDuration: '1.5s' }}
+              fill="none" 
+              viewBox="0 0 24 24"
+            >
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
           </div>
-        </form>
+        </button>
+
+        {isLangOpen && (
+          <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
+            <button
+              onClick={() => { setIdiomaApp('pt'); setIsLangOpen(false); }}
+              className={`w-full text-left px-4 py-2 text-sm flex items-center ${idiomaApp === 'pt' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              <span className="w-5 h-5 rounded-full bg-green-500 mr-2 flex items-center justify-center text-xs text-white">PT</span>
+              Português
+            </button>
+            <button
+              onClick={() => { setIdiomaApp('es'); setIsLangOpen(false); }}
+              className={`w-full text-left px-4 py-2 text-sm flex items-center ${idiomaApp === 'es' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              <span className="w-5 h-5 rounded-full bg-yellow-500 mr-2 flex items-center justify-center text-xs text-white">ES</span>
+              Español
+            </button>
+            <button
+              onClick={() => { setIdiomaApp('en'); setIsLangOpen(false); }}
+              className={`w-full text-left px-4 py-2 text-sm flex items-center ${idiomaApp === 'en' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              <span className="w-5 h-5 rounded-full bg-blue-500 mr-2 flex items-center justify-center text-xs text-white">EN</span>
+              English
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+</header>
+
+      <main className="max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">
+        {/* Mensagens de Alerta */}
+        <div className="px-4 sm:px-0 mb-6">
+          <AlertMessage message={successMessage} type="success" onDismiss={() => setSuccessMessage("")} />
+          <AlertMessage message={errorMessage} type="error" onDismiss={() => setErrorMessage("")} />
+          <AlertMessage message={showLoadedMessage ? t.mensagens.carregado : ""} type="info" onDismiss={() => setShowLoadedMessage(false)} />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          {/* Coluna Principal (Formulário) */}
+          <div className="lg:col-span-2 space-y-6">
+            <form ref={formRef} className="space-y-6">
+              {renderPersonalInfoFields()}
+              {renderResumoField()}
+              {renderExperienceFields()}
+              {renderEducationFields()}
+              {renderHabilidadesField()}
+              {renderIdiomasFields()}
+              {renderCertificacoesFields()}
+            </form>
+          </div>
+
+          {/* Coluna Lateral (Ações e Dicas) */}
+          <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24">
+            <SectionCard title="Ações" className="shadow-lg">
+              <PrimaryButton
+                onClick={generatePDF}
+                label={t.botoes.gerarCV}
+                isLoading={isGenerating}
+              />
+              {Object.keys(errors).length > 0 && (
+                 <p className="text-xs text-red-600 mt-3 text-center">{t.mensagens.erroValidacao}</p>
+              )}
+            </SectionCard>
+
+            <SectionCard title={t.dicasATS} className="bg-indigo-50/30 border-indigo-100">
+              <ul className="space-y-2 text-sm text-gray-700">
+                {t.dicasLista.map((dica, index) => (
+                    <li key={index} className="flex items-start">
+                        <svg className="flex-shrink-0 h-4 w-4 text-green-500 mr-2 mt-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>{dica}</span>
+                    </li>
+                ))}
+              </ul>
+            </SectionCard>
+          </div>
+        </div>
       </main>
 
-
-
-            {/* engraçado que o projeto é open-souce, eu coloco um qr code pra galera ajudar a hospedar essa bomba e tão pensando q é pra pagar kkkkk pra quem fala que front é facil é pq nunca teve que lidar com cliente, meu amigo... */}
-
-
-
-
-{showPaymentModal && (
-  <div
-    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="modal-title"
-    onClick={(e) => {
-      if (e.target === e.currentTarget) {
-        setShowPaymentModal(false);
-        setShowConfirmationModal(false);
-        setShowQRCode(false);
-      }
-    }}
-  >
-    <div className="relative w-full max-w-md rounded-2xl bg-gradient-to-br from-white to-gray-50 p-6 shadow-2xl animate-[fadeIn_0.3s_ease-out] border border-gray-200 mx-2">
-      {/* Botão X */}
-      <button
-        onClick={() => {
-          setShowPaymentModal(false);
-          setShowConfirmationModal(false);
-          setShowQRCode(false);
-        }}
-        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-all duration-200 hover:scale-110"
-        aria-label="Fechar modal"
+      {/* Footer Refinado com Link GitHub */}
+      <footer className="bg-gradient-to-r from-gray-900 to-gray-800 border-t border-gray-700 mt-16">
+  <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <div className="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-6">
+      <span className="text-sm font-medium text-gray-300 hover:text-white transition-colors">
+        &copy; {new Date().getFullYear()} {t.tituloApp}
+      </span>
+      
+      <span className="hidden sm:inline text-gray-500">•</span>
+      
+      <a
+        href="https://github.com/codedgabriel/ats-curriculo"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-1 text-sm font-medium text-gray-400 hover:text-indigo-400 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 rounded px-3 py-1"
+        aria-label="GitHub repository"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
         </svg>
-      </button>
-
-      {/* Conteúdo principal */}
-      <div className="text-center mb-6">
-        <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 animate-bounce">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 
-              2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09
-              C13.09 3.81 14.76 3 16.5 3 
-              19.58 3 22 5.42 22 8.5 
-              c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-          </svg>
-        </div>
-        
-        <h3 id="modal-title" className="text-2xl font-bold text-gray-800 mb-2">
-          Apoie nosso trabalho
-        </h3>
-        <p className="text-sm text-gray-600 mb-4">
-          Gostou do serviço? Considere fazer uma doação para nos ajudar a manter e melhorar a plataforma!
-        </p>
-
-        {/* Barra de progresso da doação - Textos invertidos */}
-        <div className="mb-4">
-          <div className="flex justify-between text-sm text-gray-600 mb-1">
-            <span>R$15,64 doados (ajustado manualmente)</span>
-            <span>Meta: R$40,00</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2.5">
-            <div 
-              className="bg-blue-600 h-2.5 rounded-full" 
-              style={{ width: `${(15.64 / 40) * 100}%` }}
-            ></div>
-          </div>
-          <p className="text-xs text-gray-500 mt-1 text-center">
-            Ajude-nos a alcançar nossa meta para custear o domínio!
-          </p>
-        </div>
-      </div>
-
-      {/* Botões de ação */}
-      <div className="space-y-3">
-        <button
-          onClick={() => setShowConfirmationModal(true)}
-          className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-medium rounded-lg hover:shadow-md transition-all flex items-center justify-center gap-2"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Doar
-        </button>
-        
-        <button
-          onClick={() => {
-            window.location.href = "mailto:codegabriel.ti@gmail.com?subject=Problema%20com%20geração%20de%20currículo";
-            setShowPaymentModal(false);
-          }}
-          className="w-full px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          Reportar um problema
-        </button>
-      </div>
+        {t.linkGithub}
+      </a>
+    </div>
+    
+    <div className="mt-4 flex justify-center">
+      <p className="text-xs text-gray-500 text-center max-w-md">
+        Ferramenta gratuita para criar currículos otimizados para sistemas ATS (Applicant Tracking Systems)
+      </p>
     </div>
   </div>
-)}
-
-{/* Modal de Confirmação */}
-{showConfirmationModal && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-    <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-[fadeIn_0.3s_ease-out] border border-gray-200 mx-2">
-      <button
-        onClick={() => setShowConfirmationModal(false)}
-        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-all hover:scale-110"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-      
-      <div className="mb-6">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">Faça sua doação</h3>
-        
-        <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3 mb-4">
-          <p className="text-sm text-yellow-800 text-center">
-            ⚠️ A contribuição <span className="font-bold">não é obrigatória</span> para gerar o currículo.<br />
-            Se seu currículo não foi gerado, clique em <span className="font-semibold">"Reportar um problema"</span>.
-          </p>
-        </div>
-        
-        <p className="text-sm text-gray-600 mb-4">
-          Sua doação ajuda a manter o serviço gratuito para todos e a implementar melhorias.
-        </p>
-      </div>
-
-      <div className="space-y-3">
-        <button
-          onClick={() => {
-            setShowConfirmationModal(false);
-            setShowQRCode(true);
-          }}
-          className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-medium rounded-lg hover:shadow-md transition-all"
-        >
-          Continuar para doação
-        </button>
-        
-        <button
-          onClick={() => setShowConfirmationModal(false)}
-          className="w-full px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-all"
-        >
-          Voltar
-        </button>
-      </div>
+</footer>
     </div>
-  </div>
-)}
-
-
-{/* Modal do QR Code */}
-{showQRCode && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-    <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-[fadeIn_0.3s_ease-out] border border-gray-200 mx-2">
-      <button
-        onClick={() => setShowQRCode(false)}
-        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-all hover:scale-110"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-      
-      <div className="text-center mb-2">
-        <h3 className="text-xl font-bold text-gray-800">Doação via PIX</h3>
-        <p className="text-sm text-gray-600">Escaneie o QR Code ou copie a chave</p>
-      </div>
-      
-      <div className="flex flex-col items-center mb-6">
-        <div className="p-4 bg-white rounded-xl shadow-lg ring-2 ring-blue-200/50 mb-4">
-          <img
-            src="/qrcode.png"
-            alt="QR Code para doação via PIX"
-            className="w-48 h-48 object-contain rounded-lg"
-          />
-        </div>
-        
-        <div 
-          className="w-full bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4 cursor-pointer hover:bg-blue-100 transition-colors group"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText("80eb8e06-493b-4870-9dfc-47ed230c5d16");
-              alert("Chave PIX copiada com sucesso!");
-            } catch (err) {
-              console.error('Falha ao copiar:', err);
-              // Fallback para navegadores mais antigos
-              const textArea = document.createElement('textarea');
-              textArea.value = "80eb8e06-493b-4870-9dfc-47ed230c5d16";
-              document.body.appendChild(textArea);
-              textArea.select();
-              try {
-                document.execCommand('copy');
-                alert("Chave PIX copiada com sucesso!");
-              } catch (err) {
-                alert("Não foi possível copiar automaticamente. Por favor, copie manualmente.");
-              }
-              document.body.removeChild(textArea);
-            }
-          }}
-        >
-          <p className="text-xs font-medium text-blue-800 mb-1">Chave PIX (clique para copiar):</p>
-          <div className="flex items-center justify-between bg-white p-2 rounded">
-            <p className="text-xs font-mono text-gray-700 break-all">80eb8e06-493b-4870-9dfc-47ed230c5d16</p>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 group-hover:text-blue-500 transition-colors" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z" />
-              <path d="M3 8a2 2 0 012-2v10h8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
-            </svg>
-          </div>
-        </div>
-        
-        <div className="bg-green-50 border border-green-100 rounded-lg p-3 w-full">
-          <p className="text-xs text-green-800 text-center">
-            Muito obrigado pelo seu apoio! ❤️<br />
-            Sua contribuição nos ajuda a continuar melhorando este projeto.
-          </p>
-        </div>
-      </div>
-      
-      <button
-        onClick={() => setShowQRCode(false)}
-        className="w-full px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-all"
-      >
-        Voltar
-      </button>
-    </div>
-  </div>
-)}
-
-
-
-
-
-{showLoadedMessage && (
-  <div
-    className="fixed bottom-4 left-4 z-50 w-80 max-w-full bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 rounded-lg flex items-center shadow-lg transform transition-all duration-500 ease-out animate-fade-in"
-  >
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
-      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
-    </svg>
-    <p className="text-sm">Seus dados anteriores foram carregados automaticamente.</p>
-  </div>
-)}
-
-
-            
-
-  {/* Footer */}
-  <footer className="bg-white border-t border-gray-200 py-6 sm:py-8">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="flex flex-col md:flex-row justify-between items-center">
-        <div className="flex items-center space-x-3 sm:space-x-4 mb-4 md:mb-0">
-          <a 
-            href="https://github.com/codedgabriel/ats-curriculo" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-gray-500 hover:text-gray-700 transition-colors"
-            aria-label="GitHub do projeto"
-          >
-            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" viewBox="0 0 24 24">
-              <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
-            </svg>
-          </a>
-          <a 
-            href="https://linkedin.com/in/codegabriel" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-gray-500 hover:text-blue-600 transition-colors"
-            aria-label="LinkedIn do autor"
-          >
-            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
-            </svg>
-          </a>
-        </div>
-        <p className="text-xs sm:text-sm text-gray-500">
-          Criado por <span className="font-medium text-gray-700">D. Gabriel</span> - {new Date().getFullYear()}
-        </p>
-      </div>
-    </div>
-  </footer>
-</div>
-
-);
+  );
 }
 
 export default App;
+
