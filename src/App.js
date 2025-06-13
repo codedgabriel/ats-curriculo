@@ -100,7 +100,7 @@ const InputField = React.memo(({ label, name, placeholder, value, onChange, erro
   </div>
 ));
 
-const TextareaField = React.memo(({ label, name, placeholder, value, onChange, warning, rows = 4, className = "", id }) => (
+const TextareaField = React.memo(({ label, name, placeholder, value, onChange, onBlur, warning, rows = 4, className = "", id }) => (
   <div className={className}>
     {label && <label htmlFor={id || name} className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>}
     <textarea
@@ -108,6 +108,7 @@ const TextareaField = React.memo(({ label, name, placeholder, value, onChange, w
       name={name}
       value={value || ""}
       onChange={onChange}
+      onBlur={onBlur}
       placeholder={placeholder}
       rows={rows}
       className={`block w-full px-4 py-2 border rounded-md shadow-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-300 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out ${warning ? "border-yellow-400 ring-yellow-300" : "border-gray-300 focus:border-indigo-500"}`}
@@ -558,8 +559,19 @@ function App() {
 
   const handleHabilidadesChange = useCallback((e) => {
     const inputText = e.target.value;
-    setHabilidadesInput(inputText); // Only update local input state
-  }, []); // Removed setFormData dependency
+    setHabilidadesInput(inputText);
+    
+    // Usar um timeout para processar as habilidades com um pequeno atraso
+    // Isso permite exibição em tempo real sem interferir na digitação
+    clearTimeout(window.habilidadesTimeout);
+    window.habilidadesTimeout = setTimeout(() => {
+      const habilidadesArray = inputText
+        .split(',')
+        .map(item => item.trim())
+        .filter(item => item.length > 0);
+      setFormData(prev => ({ ...prev, habilidades: habilidadesArray }));
+    }, 500); // Aguarda 500ms após parar de digitar
+  }, [setFormData]);
 
   const handleHabilidadesBlur = useCallback(() => {
     const habilidadesArray = habilidadesInput
@@ -642,6 +654,7 @@ function App() {
 
   // --- Geração de PDF (Mantida da v3 - já robusta) --- 
   const generatePDF = useCallback(async () => {
+    handleHabilidadesBlur(); // <--- ADICIONADO PARA GARANTIR ATUALIZAÇÃO DAS HABILIDADES
     setSuccessMessage("");
     setErrorMessage("");
 
@@ -1102,7 +1115,7 @@ function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [formData, idiomaApp, t, validateForm, errors]); // Adicionado 'errors' como dependência
+  }, [formData, idiomaApp, t, validateForm, errors, handleHabilidadesBlur]); // Adicionado 'handleHabilidadesBlur' como dependência
 
   // --- Renderização de Seções do Formulário (Refinadas) --- 
   const renderPersonalInfoFields = useCallback(() => (
