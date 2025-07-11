@@ -24,8 +24,9 @@ function App() {
       campos: {
         nome: "Nome Completo*",
         cargoDesejado: "Cargo Pretendido",
+        palavrasChaveVaga: "Palavras-Chave da Vaga (para análise)", // Novo
         codigoPais: "Indicativo do País",
-        ddd: "Indicativo (área)", // Pode ser menos comum em Portugal, mas mantido por enquanto
+        ddd: "Indicativo (área)",
         telefone: "Telemóvel/Telefone",
         cidade: "Localidade/Cidade",
         linkedin: "LinkedIn",
@@ -60,6 +61,7 @@ function App() {
       placeholders: {
         nome: "Ex: Ana Silva",
         cargoDesejado: "Ex: Programador Front-end React",
+        palavrasChaveVaga: "Copie e cole aqui palavras-chave da descrição da vaga, separadas por vírgula", // Novo
         ddd: "Ex: 21",
         telefone: "Ex: 912345678",
         cidade: "Ex: Lisboa, Portugal",
@@ -130,6 +132,7 @@ function App() {
       campos: {
         nome: "Full Name*",
         cargoDesejado: "Desired Position",
+        palavrasChaveVaga: "Job Keywords (for analysis)", // Novo EN
         codigoPais: "Country Code",
         ddd: "Area Code",
         telefone: "Phone",
@@ -166,6 +169,7 @@ function App() {
       placeholders: {
         nome: "Ex: John Smith",
         cargoDesejado: "Ex: React Front-end Developer",
+        palavrasChaveVaga: "Copy and paste keywords from the job description, comma-separated", // Novo EN
         ddd: "Ex: 212",
         telefone: "Ex: 555-123-4567",
         cidade: "Ex: New York, NY",
@@ -236,6 +240,7 @@ function App() {
       campos: {
         nome: "Nombre Completo*",
         cargoDesejado: "Puesto Deseado",
+        palavrasChaveVaga: "Palabras Clave de la Vacante (para análisis)", // Novo ES
         codigoPais: "Código de País",
         ddd: "Código de Área",
         telefone: "Teléfono",
@@ -272,6 +277,7 @@ function App() {
       placeholders: {
         nome: "Ej: Juan Pérez",
         cargoDesejado: "Ej: Desarrollador Front-end React",
+        palavrasChaveVaga: "Copie y pegue aquí palabras clave de la descripción de la vacante, separadas por coma", // Novo ES
         ddd: "Ej: 11",
         telefone: "Ej: 99999-9999",
         cidade: "Ej: Madrid, España",
@@ -372,6 +378,7 @@ function App() {
     portfolio: "",
     cargoDesejado: "",
     resumo: "",
+    palavrasChaveVaga: "", // Novo campo para análise de palavras-chave
     experiencias: [],
     formacoes: [{ tipo: "licenciatura", curso: "", instituicao: "", periodo: "" }], // Ajustado tipo padrão
     competenciasTecnicas: [], // Renomeado de habilidades
@@ -417,7 +424,10 @@ function App() {
       competenciasInterpessoais: "Adicione algumas competências interpessoais (soft skills).",
       projetos: "Considere adicionar projetos relevantes, especialmente se tiver pouca experiência profissional.",
       idiomas: "Se fala outros idiomas, adicione-os ao seu currículo.",
-      certificacoes: "Possui certificações? Adicione-as para valorizar o seu perfil."
+      certificacoes: "Possui certificações? Adicione-as para valorizar o seu perfil.",
+      palavrasChaveVagaInfo: "Preencheu o campo 'Palavras-Chave da Vaga'. A análise tentará encontrá-las no seu CV.",
+      palavrasChaveAusentes: (palavras) => `Considere incluir termos relevantes para a vaga como: ${palavras.join(', ')}.`,
+      palavrasChaveEncontradas: (num, total) => `Encontrámos ${num} de ${total} palavras-chave da vaga no seu CV. Bom trabalho!`
     },
     // Adicionar EN e ES depois, se necessário para completar a funcionalidade de i18n da análise
   };
@@ -511,11 +521,11 @@ function App() {
   const handleCompetenciasInterpessoaisChange = (e) => { // Nova função
     const value = e.target.value;
     setCompetenciasInterpessoaisInput(value);
-    
+
     const competenciasArray = value.split(",")
       .map(skill => skill.trim())
       .filter(skill => skill);
-    
+
     setFormData(prev => ({ ...prev, competenciasInterpessoais: competenciasArray }));
   };
 
@@ -1370,6 +1380,19 @@ function App() {
                   placeholder={t.placeholders.cargoDesejado}
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">{t.campos.palavrasChaveVaga}</label>
+              <textarea
+                name="palavrasChaveVaga"
+                value={formData.palavrasChaveVaga}
+                onChange={handleChange}
+                className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                rows={3}
+                placeholder={t.placeholders.palavrasChaveVaga}
+              />
+              <p className="text-xs text-gray-500 mt-1">Útil para a funcionalidade "Analisar CV". Separe por vírgulas.</p>
             </div>
             
             {/* Telefone com DDD e código do país */}
